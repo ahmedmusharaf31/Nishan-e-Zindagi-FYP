@@ -16,7 +16,12 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate Claude settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(del nul)",
       "Bash(npm run build:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Day 4: Map & Alerts for Rescuer Dashboard\n\n- Add React-Leaflet map with device markers and status-based colors\n- Create alert list component with filtering by status and severity\n- Build alert cards with color-coded severity badges\n- Implement alert acknowledgment and resolution\n- Add rescuer dashboard page combining map and alerts\n- Add demo data seeding for devices and alerts\n- Fix various linting issues\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Day 4: Map & Alerts for Rescuer Dashboard\n\n- Add React-Leaflet map with device markers and status-based colors\n- Create alert list component with filtering by status and severity\n- Build alert cards with color-coded severity badges\n- Implement alert acknowledgment and resolution\n- Add rescuer dashboard page combining map and alerts\n- Add demo data seeding for devices and alerts\n- Fix various linting issues\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(ls:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx shadcn@latest add tooltip -y)",
+      "Bash(timeout:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Day 5-7: Campaign Workflow, WebSocket & Reports\n\nDay 5 - Campaign Workflow:\n- Campaign card component with status badges and actions\n- Status timeline for campaign history visualization\n- Campaign assignment dialog for admin users\n- Campaign notes functionality\n- Campaign list page with tabs and filtering\n- Campaign detail page with map, timeline, and notes\n\nDay 6 - WebSocket & Reports:\n- WebSocket client with reconnection logic\n- Mock WebSocket client for demo mode\n- WebSocket provider for real-time updates\n- Live connection status indicator in header\n- Public alerts page \\(read-only view\\)\n- Reports page with Recharts analytics \\(pie, area, bar charts\\)\n\nDay 7 - Polish & Demo Prep:\n- Enhanced demo data with campaigns and rescuers\n- Fixed all TypeScript and ESLint errors\n- Updated progress.md documentation\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
