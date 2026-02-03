@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
+import { useWebSocket } from '@/providers/websocket-provider';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -13,8 +14,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, Menu, User } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Bell, LogOut, Menu, User, Wifi, WifiOff } from 'lucide-react';
 import { useAlertStore } from '@/store/alert-store';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -24,6 +32,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
   const { getActiveAlerts } = useAlertStore();
+  const { status: wsStatus, isConnected } = useWebSocket();
 
   const activeAlerts = getActiveAlerts();
 
@@ -72,6 +81,42 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-2">
+          {/* Connection Status */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5 px-2 py-1 rounded-full text-xs',
+                    isConnected
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : wsStatus === 'connecting'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                      : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                  )}
+                >
+                  {isConnected ? (
+                    <Wifi className="h-3 w-3" />
+                  ) : (
+                    <WifiOff className="h-3 w-3" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isConnected ? 'Live' : wsStatus === 'connecting' ? 'Connecting' : 'Offline'}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {isConnected
+                    ? 'Receiving live updates'
+                    : wsStatus === 'connecting'
+                    ? 'Connecting to server...'
+                    : 'Not connected to live updates'}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AuthGuard } from '@/components/auth';
 import { Sidebar, Header, MobileSidebar } from '@/components/layout';
+import { WebSocketProvider } from '@/providers/websocket-provider';
 import { useDeviceStore, useAlertStore, useCampaignStore, useUserStore } from '@/store';
 import { seedDemoData } from '@/lib/storage/indexed-db';
 
@@ -33,22 +34,24 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
-        {/* Desktop Sidebar */}
-        <Sidebar />
+      <WebSocketProvider autoConnect={true} enableNotifications={true}>
+        <div className="min-h-screen bg-background">
+          {/* Desktop Sidebar */}
+          <Sidebar />
 
-        {/* Mobile Sidebar */}
-        <MobileSidebar
-          isOpen={isMobileSidebarOpen}
-          onClose={() => setIsMobileSidebarOpen(false)}
-        />
+          {/* Mobile Sidebar */}
+          <MobileSidebar
+            isOpen={isMobileSidebarOpen}
+            onClose={() => setIsMobileSidebarOpen(false)}
+          />
 
-        {/* Main Content */}
-        <div className="lg:pl-64">
-          <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
-          <main className="p-4 lg:p-6">{children}</main>
+          {/* Main Content */}
+          <div className="lg:pl-64">
+            <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
+            <main className="p-4 lg:p-6">{children}</main>
+          </div>
         </div>
-      </div>
+      </WebSocketProvider>
     </AuthGuard>
   );
 }

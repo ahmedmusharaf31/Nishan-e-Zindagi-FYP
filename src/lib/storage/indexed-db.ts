@@ -175,6 +175,22 @@ export async function seedDemoData() {
       createdAt: new Date().toISOString(),
     },
     {
+      id: 'rescuer-user-2',
+      email: 'ahmed.khan@demo.com',
+      displayName: 'Ahmed Khan',
+      role: 'rescuer',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'rescuer-user-3',
+      email: 'fatima.zahra@demo.com',
+      displayName: 'Fatima Zahra',
+      role: 'rescuer',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
       id: 'public-user-1',
       email: 'public@demo.com',
       displayName: 'Public User',
@@ -184,9 +200,149 @@ export async function seedDemoData() {
     },
   ];
 
+  // Seed demo campaigns
+  const demoCampaigns: Campaign[] = [
+    {
+      id: 'campaign-1',
+      alertId: 'alert-5',
+      status: 'assigned',
+      assignedRescuerId: 'rescuer-user-1',
+      location: { latitude: 31.5204, longitude: 74.3587 },
+      statusHistory: [
+        {
+          status: 'initiated',
+          timestamp: new Date(Date.now() - 10 * 60000).toISOString(),
+          note: 'Campaign initiated for SOS signal',
+        },
+        {
+          status: 'assigned',
+          timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
+          note: 'Assigned to Rescuer Ali',
+        },
+      ],
+      notes: [
+        {
+          id: 'note-1',
+          content: 'Contacted local emergency services for backup.',
+          createdAt: new Date(Date.now() - 3 * 60000).toISOString(),
+          createdBy: 'Rescuer Ali',
+        },
+      ],
+      createdAt: new Date(Date.now() - 10 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 5 * 60000).toISOString(),
+    },
+    {
+      id: 'campaign-2',
+      alertId: 'alert-1',
+      status: 'en_route',
+      assignedRescuerId: 'rescuer-user-2',
+      location: { latitude: 30.1575, longitude: 71.5249 },
+      statusHistory: [
+        {
+          status: 'initiated',
+          timestamp: new Date(Date.now() - 30 * 60000).toISOString(),
+          note: 'Campaign initiated for critical battery',
+        },
+        {
+          status: 'assigned',
+          timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
+          note: 'Assigned to Ahmed Khan',
+        },
+        {
+          status: 'accepted',
+          timestamp: new Date(Date.now() - 20 * 60000).toISOString(),
+          note: 'Campaign accepted',
+          updatedBy: 'Ahmed Khan',
+        },
+        {
+          status: 'en_route',
+          timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
+          note: 'En route to location',
+          updatedBy: 'Ahmed Khan',
+        },
+      ],
+      notes: [],
+      createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 15 * 60000).toISOString(),
+    },
+    {
+      id: 'campaign-3',
+      alertId: 'alert-4',
+      status: 'resolved',
+      assignedRescuerId: 'rescuer-user-3',
+      location: { latitude: 24.8607, longitude: 67.0011 },
+      statusHistory: [
+        {
+          status: 'initiated',
+          timestamp: new Date(Date.now() - 48 * 3600000).toISOString(),
+          note: 'Campaign initiated',
+        },
+        {
+          status: 'assigned',
+          timestamp: new Date(Date.now() - 47 * 3600000).toISOString(),
+          note: 'Assigned to Fatima Zahra',
+        },
+        {
+          status: 'accepted',
+          timestamp: new Date(Date.now() - 46 * 3600000).toISOString(),
+          updatedBy: 'Fatima Zahra',
+        },
+        {
+          status: 'en_route',
+          timestamp: new Date(Date.now() - 45 * 3600000).toISOString(),
+          updatedBy: 'Fatima Zahra',
+        },
+        {
+          status: 'on_scene',
+          timestamp: new Date(Date.now() - 44 * 3600000).toISOString(),
+          updatedBy: 'Fatima Zahra',
+        },
+        {
+          status: 'in_progress',
+          timestamp: new Date(Date.now() - 43 * 3600000).toISOString(),
+          note: 'Calibrating sensors',
+          updatedBy: 'Fatima Zahra',
+        },
+        {
+          status: 'resolved',
+          timestamp: new Date(Date.now() - 42 * 3600000).toISOString(),
+          note: 'Sensors calibrated successfully',
+          updatedBy: 'Fatima Zahra',
+        },
+      ],
+      notes: [
+        {
+          id: 'note-2',
+          content: 'Sensor drift was minor, calibration completed in 30 minutes.',
+          createdAt: new Date(Date.now() - 42 * 3600000).toISOString(),
+          createdBy: 'Fatima Zahra',
+        },
+      ],
+      createdAt: new Date(Date.now() - 48 * 3600000).toISOString(),
+      updatedAt: new Date(Date.now() - 42 * 3600000).toISOString(),
+    },
+    {
+      id: 'campaign-4',
+      alertId: 'alert-2',
+      status: 'initiated',
+      location: { latitude: 34.0151, longitude: 71.5249 },
+      statusHistory: [
+        {
+          status: 'initiated',
+          timestamp: new Date(Date.now() - 2 * 60000).toISOString(),
+          note: 'Campaign initiated for offline device',
+        },
+      ],
+      notes: [],
+      createdAt: new Date(Date.now() - 2 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 60000).toISOString(),
+    },
+  ];
+
   await db.devices.bulkAdd(demoDevices);
   await db.alerts.bulkAdd(demoAlerts);
   await db.users.bulkAdd(demoUsers);
+  await db.campaigns.bulkAdd(demoCampaigns);
 
   console.log('Demo data seeded successfully');
 }
