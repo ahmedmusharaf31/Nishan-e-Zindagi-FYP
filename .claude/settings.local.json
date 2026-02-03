@@ -13,7 +13,8 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Next.js project setup with authentication and dashboard\n\n- Set up Next.js with TypeScript, Tailwind CSS, and shadcn/ui\n- Add Firebase authentication with role-based access control\n- Create dashboard layout with sidebar navigation\n- Add user management with CRUD operations\n- Implement device status monitoring components\n- Add Zustand stores for state management\n- Include IndexedDB for offline storage support\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate Claude settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate Claude settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(del nul)"
     ]
   }
 }
