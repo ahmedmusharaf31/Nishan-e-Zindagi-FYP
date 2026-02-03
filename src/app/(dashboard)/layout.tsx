@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AuthGuard } from '@/components/auth';
 import { Sidebar, Header, MobileSidebar } from '@/components/layout';
 import { useDeviceStore, useAlertStore, useCampaignStore, useUserStore } from '@/store';
+import { seedDemoData } from '@/lib/storage/indexed-db';
 
 export default function DashboardLayout({
   children,
@@ -19,10 +20,15 @@ export default function DashboardLayout({
   const fetchUsers = useUserStore(state => state.fetchUsers);
 
   useEffect(() => {
-    fetchDevices();
-    fetchAlerts();
-    fetchCampaigns();
-    fetchUsers();
+    // Seed demo data on first load, then fetch all data
+    const initializeData = async () => {
+      await seedDemoData();
+      fetchDevices();
+      fetchAlerts();
+      fetchCampaigns();
+      fetchUsers();
+    };
+    initializeData();
   }, [fetchDevices, fetchAlerts, fetchCampaigns, fetchUsers]);
 
   return (

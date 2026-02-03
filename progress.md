@@ -86,25 +86,39 @@ A web dashboard for the Nishan-e-Zindagi rescue system with three user views (Ad
 
 ---
 
-## Remaining Work
+### Day 4: Map & Alerts (Rescuer Core) ✅
 
-### Day 4: Map & Alerts (Rescuer Core)
+**Morning Tasks Completed:**
+- [x] Installed and configured React-Leaflet with dynamic imports (SSR-safe)
+- [x] Created MapContainer/MapView component with OpenStreetMap tiles
+- [x] Built DeviceMarker component with status-based color coding (green=online, red=offline, amber=warning, red=critical)
+- [x] Added marker popups with device details (name, status, battery level, last seen)
 
-**Morning:**
-- [ ] Install and configure React-Leaflet
-- [ ] Create MapContainer component
-- [ ] Build DeviceMarker component with status colors
-- [ ] Add marker popups with device info
+**Afternoon Tasks Completed:**
+- [x] Built AlertList component with search, status, and severity filtering
+- [x] Created AlertCard component with color-coded severity badges (low=blue, medium=amber, high=orange, critical=red)
+- [x] Implemented alert acknowledgment and resolution functionality
+- [x] Added alert toast notification utility for new alerts
 
-**Afternoon:**
-- [ ] Build alert list component
-- [ ] Create alert cards with severity badges (low/medium/high/critical)
-- [ ] Implement alert acknowledgment
-- [ ] Add toast notifications for new alerts
+**Key Files Created:**
+- `src/components/map/map-view.tsx` - Base map component with Leaflet
+- `src/components/map/device-marker.tsx` - Device markers with popups
+- `src/components/map/dynamic-map.tsx` - SSR-safe dynamic imports
+- `src/components/map/index.ts` - Map component exports
+- `src/components/alerts/alert-card.tsx` - Alert card with severity badges
+- `src/components/alerts/alert-list.tsx` - Filterable alert list
+- `src/components/alerts/alert-toast.tsx` - Toast notification utility
+- `src/components/alerts/index.ts` - Alert component exports
+- `src/components/ui/skeleton.tsx` - Skeleton loading component
+- `src/app/(dashboard)/rescuer/page.tsx` - Rescuer dashboard page
 
-**Deliverable:** Map showing device locations + alert list
+**Additional Updates:**
+- Updated `src/lib/storage/indexed-db.ts` with demo data seeding
+- Updated `src/app/(dashboard)/layout.tsx` to seed demo data on load
 
 ---
+
+## Remaining Work
 
 ### Day 5: Campaign Workflow
 
@@ -205,7 +219,7 @@ src/
 │   │   │   ├── page.tsx           ✅
 │   │   │   └── users/page.tsx     ✅
 │   │   ├── rescuer/
-│   │   │   ├── page.tsx           ⏳ (Day 4)
+│   │   │   ├── page.tsx           ✅
 │   │   │   └── campaigns/page.tsx ⏳ (Day 5)
 │   │   ├── public/page.tsx        ⏳ (Day 6)
 │   │   └── reports/page.tsx       ⏳ (Day 6)
@@ -217,9 +231,9 @@ src/
 │   ├── layout/                    ✅
 │   ├── dashboard/                 ✅
 │   ├── devices/                   ✅
-│   ├── alerts/                    ⏳ (Day 4)
+│   ├── alerts/                    ✅
 │   ├── campaigns/                 ⏳ (Day 5)
-│   ├── map/                       ⏳ (Day 4)
+│   ├── map/                       ✅
 │   ├── reports/                   ⏳ (Day 6)
 │   └── ui/                        ✅
 ├── providers/

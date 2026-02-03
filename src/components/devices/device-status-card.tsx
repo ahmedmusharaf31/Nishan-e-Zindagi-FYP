@@ -19,7 +19,6 @@ const statusConfig: Record<DeviceStatus, { color: string; icon: React.ElementTyp
 
 export function DeviceStatusCard({ device, onClick }: DeviceStatusCardProps) {
   const status = statusConfig[device.status];
-  const StatusIcon = status.icon;
 
   const getBatteryColor = (level: number) => {
     if (level > 50) return 'text-green-500';

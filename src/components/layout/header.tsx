@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, Menu, Moon, Sun, User } from 'lucide-react';
+import { Bell, LogOut, Menu, User } from 'lucide-react';
 import { useAlertStore } from '@/store/alert-store';
 
 interface HeaderProps {

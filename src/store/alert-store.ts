@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Alert, AlertSeverity, AlertStatus, AlertType } from '@/types';
+import { Alert, AlertSeverity, AlertStatus } from '@/types';
 import { db } from '@/lib/storage/indexed-db';
 
 interface AlertState {
