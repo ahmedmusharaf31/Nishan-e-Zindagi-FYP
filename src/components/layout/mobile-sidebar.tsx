@@ -1,0 +1,136 @@
+"use client";
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/providers/auth-provider';
+import {
+  LayoutDashboard,
+  Users,
+  MapPin,
+  Bell,
+  Megaphone,
+  BarChart3,
+  Shield,
+  X,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: Array<'admin' | 'rescuer' | 'public'>;
+}
+
+const navItems: NavItem[] = [
+  {
+    title: 'Dashboard',
+    href: '/admin',
+    icon: LayoutDashboard,
+    roles: ['admin'],
+  },
+  {
+    title: 'User Management',
+    href: '/admin/users',
+    icon: Users,
+    roles: ['admin'],
+  },
+  {
+    title: 'Map & Alerts',
+    href: '/rescuer',
+    icon: MapPin,
+    roles: ['rescuer'],
+  },
+  {
+    title: 'Campaigns',
+    href: '/rescuer/campaigns',
+    icon: Megaphone,
+    roles: ['rescuer', 'admin'],
+  },
+  {
+    title: 'Public Alerts',
+    href: '/public',
+    icon: Bell,
+    roles: ['public', 'admin', 'rescuer'],
+  },
+  {
+    title: 'Reports',
+    href: '/reports',
+    icon: BarChart3,
+    roles: ['admin', 'rescuer'],
+  },
+];
+
+interface MobileSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
+  const pathname = usePathname();
+  const { userProfile } = useAuth();
+
+  const filteredNavItems = navItems.filter(
+    item => userProfile && item.roles.includes(userProfile.role)
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+        onClick={onClose}
+      />
+
+      {/* Sidebar */}
+      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-card lg:hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-4 border-b">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <Shield className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-semibold text-sm">Nishan-e-Zindagi</h1>
+              <p className="text-xs text-muted-foreground">Rescue Dashboard</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Navigation */}
+        <ScrollArea className="flex-1 py-4">
+          <nav className="px-3 space-y-1">
+            {filteredNavItems.map((item) => {
+              const isActive = pathname === item.href ||
+                (item.href !== '/admin' && item.href !== '/rescuer' && item.href !== '/public' && pathname.startsWith(item.href));
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.title}
+                </Link>
+              );
+            })}
+          </nav>
+        </ScrollArea>
+      </div>
+    </>
+  );
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" log --oneline --all)",
+      "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" show --name-only --pretty=\"\" a51f146)",
+      "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" show --name-only --pretty=\"\" c32cebf)",
+      "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" branch -a)",
+      "Bash(powershell -Command \"Get-ChildItem -Recurse -Exclude ''.git'' -Force | Select-Object FullName\")",
+      "Bash(npx create-next-app@14:*)",
+      "Bash(npm install:*)",
+      "Bash(gh auth:*)",
+      "Bash(winget install:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
