@@ -1,0 +1,509 @@
+================================================================================
+                    NISHAN-E-ZINDAGI - DATA REQUIREMENTS
+                    Meshtastic Firmware Integration Guide
+================================================================================
+
+Project: Nishan-e-Zindagi (Sign of Life)
+Purpose: Emergency Response & Rescue Coordination System
+Hardware: Meshtastic LoRa Mesh Network Devices
+
+================================================================================
+                         1. MESSAGE TYPES & SIZES
+================================================================================
+
+The following message types need to be transmitted over the Meshtastic mesh:
+
++-----------------------+-------------+-------------+---------------------------+
+| Message Type          | Min Size    | Max Size    | Frequency                 |
++-----------------------+-------------+-------------+---------------------------+
+| Device Heartbeat      | 20 bytes    | 50 bytes    | Every 5 minutes           |
+| Location Update       | 25 bytes    | 40 bytes    | Every 20-60 seconds       |
+| Battery Telemetry     | 10 bytes    | 20 bytes    | Every 2-5 minutes         |
+| SOS Alert             | 30 bytes    | 100 bytes   | On trigger (immediate)    |
+| Status Change         | 15 bytes    | 30 bytes    | On event                  |
+| Campaign Update       | 50 bytes    | 200 bytes   | On status change          |
+| Acknowledgment        | 10 bytes    | 20 bytes    | Response to messages      |
++-----------------------+-------------+-------------+---------------------------+
+
+TOTAL BANDWIDTH ESTIMATE:
+- Idle Mode: ~0.5 KB/hour per device
+- Normal Operation: ~2-5 KB/hour per device
+- High Activity (emergency): ~10-20 KB/hour per device
+
+================================================================================
+                         2. GPS/LOCATION DATA
+================================================================================
+
+FORMAT: WGS84 (Decimal Degrees)
+PRECISION: 4 decimal places (±11 meters accuracy)
+
+Structure (25-40 bytes):
++-------------------+------------+------------------------------------------+
+| Field             | Size       | Description                              |
++-------------------+------------+------------------------------------------+
+| device_id         | 4 bytes    | Unique device identifier (uint32)        |
+| latitude          | 4 bytes    | Latitude (int32, multiply by 1e-7)       |
+| longitude         | 4 bytes    | Longitude (int32, multiply by 1e-7)      |
+| altitude          | 2 bytes    | Altitude in meters (int16)               |
+| accuracy          | 1 byte     | Horizontal accuracy in meters (uint8)    |
+| timestamp         | 4 bytes    | Unix timestamp (uint32)                  |
+| satellites        | 1 byte     | Number of GPS satellites (uint8)         |
+| speed             | 2 bytes    | Speed in cm/s (uint16) [optional]        |
+| heading           | 2 bytes    | Heading in degrees (uint16) [optional]   |
++-------------------+------------+------------------------------------------+
+
+Meshtastic Position Packet Format:
+{
+  "latitude_i": int32,      // Latitude * 1e7 (e.g., 24.8607 -> 248607000)
+  "longitude_i": int32,     // Longitude * 1e7 (e.g., 67.0011 -> 670011000)
+  "altitude": int32,        // Meters above sea level
+  "precision_bits": uint32, // Position precision
+  "time": uint32            // Unix timestamp
+}
+
+SAMPLE LOCATIONS (Pakistan Coverage Area):
++-------------------+------------+------------+----------+
+| Station           | Latitude   | Longitude  | City     |
++-------------------+------------+------------+----------+
+| Karachi Alpha     | 24.8607    | 67.0011    | Karachi  |
+| Lahore Beta       | 31.5204    | 74.3587    | Lahore   |
+| Islamabad Gamma   | 33.6844    | 73.0479    | Islamabad|
+| Peshawar Delta    | 34.0151    | 71.5249    | Peshawar |
+| Quetta Epsilon    | 30.1798    | 66.9750    | Quetta   |
+| Multan Zeta       | 30.1575    | 71.5249    | Multan   |
++-------------------+------------+------------+----------+
+
+================================================================================
+                         3. BATTERY & TELEMETRY DATA
+================================================================================
+
+Structure (10-20 bytes):
++-------------------+------------+------------------------------------------+
+| Field             | Size       | Description                              |
++-------------------+------------+------------------------------------------+
+| device_id         | 4 bytes    | Unique device identifier                 |
+| battery_level     | 1 byte     | Percentage 0-100 (uint8)                 |
+| voltage           | 2 bytes    | Voltage in mV (uint16)                   |
+| charging          | 1 bit      | Is device charging (boolean)             |
+| temperature       | 1 byte     | Temperature in Celsius (int8) [optional] |
+| channel_util      | 1 byte     | Channel utilization % (uint8) [optional] |
+| air_util_tx       | 1 byte     | TX air utilization % (uint8) [optional]  |
+| timestamp         | 4 bytes    | Unix timestamp                           |
++-------------------+------------+------------------------------------------+
+
+Meshtastic Telemetry Packet Format:
+{
+  "device_metrics": {
+    "battery_level": uint32,        // 0-100%
+    "voltage": float,               // Volts
+    "channel_utilization": float,   // 0-100%
+    "air_util_tx": float            // 0-100%
+  },
+  "time": uint32                    // Unix timestamp
+}
+
+BATTERY THRESHOLDS:
+- CRITICAL: 0-5% (immediate alert, red indicator)
+- WARNING: 6-20% (caution alert, amber indicator)
+- NORMAL: 21-100% (no alert, green indicator)
+
+================================================================================
+                         4. ALERT/SOS DATA
+================================================================================
+
+Alert Types:
++-------------------+----------------------------------------------------------+
+| Type              | Description                                              |
++-------------------+----------------------------------------------------------+
+| sos               | Manual emergency distress signal (button press)          |
+| battery_low       | Battery below critical threshold                         |
+| sensor_threshold  | Environmental sensor exceeded limits                     |
+| geofence          | Device left designated area [future]                     |
+| connection_lost   | Device went offline unexpectedly                         |
+| fall_detected     | Accelerometer detected fall [future]                     |
++-------------------+----------------------------------------------------------+
+
+Alert Severity Levels:
++-------------------+------------+------------------------------------------+
+| Severity          | Priority   | Response Action                          |
++-------------------+------------+------------------------------------------+
+| low               | 4          | Monitor/Log only                         |
+| medium            | 3          | Review within 1 hour                     |
+| high              | 2          | Immediate attention required             |
+| critical          | 1          | Emergency dispatch required              |
++-------------------+------------+------------------------------------------+
+
+Alert Packet Structure (30-100 bytes):
++-------------------+------------+------------------------------------------+
+| Field             | Size       | Description                              |
++-------------------+------------+------------------------------------------+
+| alert_id          | 4 bytes    | Unique alert identifier                  |
+| device_id         | 4 bytes    | Source device                            |
+| alert_type        | 1 byte     | Type enum (0-5)                          |
+| severity          | 1 byte     | Severity level (1-4)                     |
+| latitude          | 4 bytes    | Location latitude                        |
+| longitude         | 4 bytes    | Location longitude                       |
+| timestamp         | 4 bytes    | Alert trigger time                       |
+| payload           | 0-78 bytes | Additional context (variable)            |
++-------------------+------------+------------------------------------------+
+
+SOS Button Protocol:
+1. Single press: Send location ping
+2. Double press: Request status update
+3. Long press (3s): Trigger SOS alert (severity: critical)
+4. Triple press: Cancel active alert
+
+================================================================================
+                         5. DEVICE STATUS DATA
+================================================================================
+
+Device Status Enum:
++-------------------+------------+------------------------------------------+
+| Status            | Value      | Description                              |
++-------------------+------------+------------------------------------------+
+| online            | 0x01       | Device connected, all systems normal     |
+| offline           | 0x02       | Device not responding (>5 min timeout)   |
+| warning           | 0x03       | Minor issue (low battery, weak signal)   |
+| critical          | 0x04       | Major issue requiring attention          |
++-------------------+------------+------------------------------------------+
+
+Device Heartbeat Structure (20-50 bytes):
++-------------------+------------+------------------------------------------+
+| Field             | Size       | Description                              |
++-------------------+------------+------------------------------------------+
+| device_id         | 4 bytes    | Unique identifier                        |
+| status            | 1 byte     | Current status enum                      |
+| battery_level     | 1 byte     | Battery percentage                       |
+| signal_strength   | 1 byte     | SNR or RSSI value                        |
+| hop_count         | 1 byte     | Mesh hops to gateway                     |
+| uptime            | 4 bytes    | Seconds since boot                       |
+| firmware_version  | 2 bytes    | Version number                           |
+| timestamp         | 4 bytes    | Current time                             |
++-------------------+------------+------------------------------------------+
+
+================================================================================
+                         6. CAMPAIGN/RESCUE DATA
+================================================================================
+
+Campaign Status Flow:
+initiated -> assigned -> accepted -> en_route -> on_scene -> in_progress -> resolved
+                                                                         -> cancelled
+
+Campaign Status Enum:
++-------------------+------------+------------------------------------------+
+| Status            | Value      | Description                              |
++-------------------+------------+------------------------------------------+
+| initiated         | 0x01       | Campaign created from alert              |
+| assigned          | 0x02       | Rescuer assigned to campaign             |
+| accepted          | 0x03       | Rescuer accepted assignment              |
+| en_route          | 0x04       | Rescuer traveling to location            |
+| on_scene          | 0x05       | Rescuer arrived at location              |
+| in_progress       | 0x06       | Active rescue operation                  |
+| resolved          | 0x07       | Operation completed successfully         |
+| cancelled         | 0x08       | Operation cancelled                      |
++-------------------+------------+------------------------------------------+
+
+Campaign Update Packet (50-200 bytes):
++-------------------+------------+------------------------------------------+
+| Field             | Size       | Description                              |
++-------------------+------------+------------------------------------------+
+| campaign_id       | 4 bytes    | Unique campaign identifier               |
+| alert_id          | 4 bytes    | Related alert                            |
+| status            | 1 byte     | Current status enum                      |
+| rescuer_id        | 4 bytes    | Assigned rescuer (0 if unassigned)       |
+| target_lat        | 4 bytes    | Target location latitude                 |
+| target_lng        | 4 bytes    | Target location longitude                |
+| rescuer_lat       | 4 bytes    | Rescuer current latitude                 |
+| rescuer_lng       | 4 bytes    | Rescuer current longitude                |
+| eta_seconds       | 2 bytes    | Estimated time of arrival                |
+| timestamp         | 4 bytes    | Last update time                         |
+| note_length       | 1 byte     | Length of note field                     |
+| note              | 0-100 bytes| Status note (variable)                   |
++-------------------+------------+------------------------------------------+
+
+================================================================================
+                         7. USER/AUTHENTICATION DATA
+================================================================================
+
+User Roles:
++-------------------+----------------------------------------------------------+
+| Role              | Permissions                                              |
++-------------------+----------------------------------------------------------+
+| admin             | Full access: users, devices, alerts, campaigns, reports  |
+| rescuer           | Own campaigns, device map, alert management              |
+| public            | Read-only: public alerts, general status                 |
++-------------------+----------------------------------------------------------+
+
+User Profile Structure (stored on server, not transmitted via mesh):
++-------------------+------------+------------------------------------------+
+| Field             | Size       | Description                              |
++-------------------+------------+------------------------------------------+
+| id                | UUID       | Unique user identifier                   |
+| email             | string     | Login email (max 255 chars)              |
+| display_name      | string     | Full name (max 100 chars)                |
+| role              | enum       | admin | rescuer | public                 |
+| is_active         | boolean    | Account status                           |
+| device_id         | uint32     | Linked Meshtastic device (rescuers)      |
+| created_at        | timestamp  | Account creation date                    |
+| updated_at        | timestamp  | Last modification date                   |
++-------------------+------------+------------------------------------------+
+
+================================================================================
+                         8. MESHTASTIC CHANNEL CONFIGURATION
+================================================================================
+
+Recommended Channel Settings:
++-------------------+----------------------------------------------------------+
+| Parameter         | Value                                                    |
++-------------------+----------------------------------------------------------+
+| Channel Name      | NZL-RESCUE (8 chars max for display)                     |
+| Channel Key       | AES256 encryption key                                    |
+| Modem Preset      | LONG_FAST (best range/speed balance)                     |
+| Region            | UNSET or appropriate for Pakistan                        |
+| Hop Limit         | 3 (default) or 7 (extended coverage)                     |
+| TX Power          | Maximum allowed by hardware                              |
++-------------------+----------------------------------------------------------+
+
+Meshtastic Port Numbers (AppNum):
++-------------------+------------+------------------------------------------+
+| Port              | Number     | Usage                                    |
++-------------------+------------+------------------------------------------+
+| POSITION_APP      | 3          | GPS location updates                     |
+| TELEMETRY_APP     | 67         | Device telemetry (battery, etc.)         |
+| TEXT_MESSAGE_APP  | 1          | Text communications                      |
+| NODEINFO_APP      | 4          | Device information                       |
+| PRIVATE_APP       | 256        | Custom application data (alerts, etc.)   |
++-------------------+------------+------------------------------------------+
+
+================================================================================
+                         9. DATA STORAGE REQUIREMENTS
+================================================================================
+
+Client-Side (IndexedDB - Browser):
++-------------------+------------+------------+-------------------------------+
+| Table             | Records    | Avg Size   | Total Size                    |
++-------------------+------------+------------+-------------------------------+
+| users             | ~100       | 200 bytes  | ~20 KB                        |
+| devices           | ~50        | 250 bytes  | ~12.5 KB                      |
+| alerts            | ~500       | 350 bytes  | ~175 KB                       |
+| campaigns         | ~200       | 500 bytes  | ~100 KB                       |
++-------------------+------------+------------+-------------------------------+
+| TOTAL             |            |            | ~307.5 KB (typical)           |
++-------------------+------------+------------+-------------------------------+
+
+Server-Side (Future Backend):
++-------------------+------------+------------------------------------------+
+| Entity            | Growth Rate| Retention Policy                         |
++-------------------+------------+------------------------------------------+
+| Users             | Slow       | Permanent (with soft delete)             |
+| Devices           | Slow       | Permanent                                |
+| Alerts            | ~50/day    | 90 days active, archive after            |
+| Campaigns         | ~20/day    | Permanent (audit trail)                  |
+| Location History  | ~4000/day  | 30 days, then aggregate                  |
++-------------------+------------+------------------------------------------+
+
+================================================================================
+                         10. PROTOCOL BUFFER DEFINITIONS
+================================================================================
+
+For efficient Meshtastic transmission, use Protocol Buffers:
+
+```protobuf
+// Location Update
+message LocationUpdate {
+  uint32 device_id = 1;
+  sfixed32 latitude_i = 2;   // lat * 1e7
+  sfixed32 longitude_i = 3;  // lng * 1e7
+  int32 altitude = 4;        // meters
+  uint32 timestamp = 5;
+  uint32 accuracy = 6;       // meters
+}
+
+// Battery Telemetry
+message BatteryTelemetry {
+  uint32 device_id = 1;
+  uint32 battery_level = 2;  // 0-100
+  uint32 voltage_mv = 3;     // millivolts
+  bool charging = 4;
+  int32 temperature = 5;     // celsius
+  uint32 timestamp = 6;
+}
+
+// SOS Alert
+message SOSAlert {
+  uint32 alert_id = 1;
+  uint32 device_id = 2;
+  uint32 alert_type = 3;     // enum
+  uint32 severity = 4;       // 1-4
+  sfixed32 latitude_i = 5;
+  sfixed32 longitude_i = 6;
+  uint32 timestamp = 7;
+  string message = 8;        // max 100 chars
+}
+
+// Device Status
+message DeviceStatus {
+  uint32 device_id = 1;
+  uint32 status = 2;         // enum
+  uint32 battery_level = 3;
+  int32 signal_strength = 4; // dBm
+  uint32 hop_count = 5;
+  uint32 uptime = 6;
+  uint32 timestamp = 7;
+}
+
+// Campaign Update
+message CampaignUpdate {
+  uint32 campaign_id = 1;
+  uint32 alert_id = 2;
+  uint32 status = 3;         // enum
+  uint32 rescuer_id = 4;
+  sfixed32 target_lat = 5;
+  sfixed32 target_lng = 6;
+  sfixed32 rescuer_lat = 7;
+  sfixed32 rescuer_lng = 8;
+  uint32 eta_seconds = 9;
+  uint32 timestamp = 10;
+  string note = 11;
+}
+```
+
+================================================================================
+                         11. HARDWARE RECOMMENDATIONS
+================================================================================
+
+Based on data requirements:
+
+MINIMUM REQUIREMENTS:
++-------------------+----------------------------------------------------------+
+| Component         | Specification                                            |
++-------------------+----------------------------------------------------------+
+| Microcontroller   | ESP32 (recommended for Meshtastic)                       |
+| Flash Storage     | 4MB minimum (8MB recommended)                            |
+| RAM               | 520KB SRAM (ESP32 default)                               |
+| LoRa Module       | SX1262 or SX1276 (915MHz or 868MHz)                      |
+| GPS Module        | NEO-6M or better (for position tracking)                 |
+| Battery           | 3000mAh LiPo minimum (for 24+ hour operation)            |
+| Display           | Optional: 0.96" OLED for status                          |
++-------------------+----------------------------------------------------------+
+
+RECOMMENDED DEVICES:
+1. Heltec LoRa 32 V3 (built-in display)
+2. LILYGO T-Beam (built-in GPS + battery holder)
+3. RAK WisBlock (modular, industrial grade)
+4. LILYGO T-Echo (e-ink display, long battery)
+
+GATEWAY REQUIREMENTS:
++-------------------+----------------------------------------------------------+
+| Component         | Specification                                            |
++-------------------+----------------------------------------------------------+
+| Device            | Raspberry Pi 4 or similar                                |
+| Meshtastic Node   | USB-connected Meshtastic device                          |
+| Internet          | WiFi or Ethernet for WebSocket server                    |
+| Storage           | 32GB SD card minimum                                     |
+| Power             | Reliable power supply or UPS                             |
++-------------------+----------------------------------------------------------+
+
+================================================================================
+                         12. BANDWIDTH CALCULATIONS
+================================================================================
+
+Per Device (Normal Operation):
++-------------------+------------+------------+-------------------------------+
+| Message Type      | Size       | Frequency  | Daily Bandwidth               |
++-------------------+------------+------------+-------------------------------+
+| Location Update   | 30 bytes   | 1/minute   | 43.2 KB/day                   |
+| Battery Telemetry | 15 bytes   | 1/5 min    | 4.3 KB/day                    |
+| Heartbeat         | 25 bytes   | 1/5 min    | 7.2 KB/day                    |
+| Status Updates    | 20 bytes   | ~10/day    | 0.2 KB/day                    |
++-------------------+------------+------------+-------------------------------+
+| TOTAL PER DEVICE  |            |            | ~55 KB/day                    |
++-------------------+------------+------------+-------------------------------+
+
+Network Capacity Planning:
+- 10 devices: ~550 KB/day
+- 50 devices: ~2.75 MB/day
+- 100 devices: ~5.5 MB/day
+
+MESHTASTIC LIMITATIONS:
+- Max packet size: 237 bytes (payload)
+- Duty cycle limits vary by region
+- Channel utilization should stay below 25%
+- Recommend < 1 message per 30 seconds per device during normal operation
+
+================================================================================
+                         13. DATA VALIDATION RULES
+================================================================================
+
+Location Validation:
+- Latitude: -90.0 to 90.0
+- Longitude: -180.0 to 180.0
+- Altitude: -1000 to 50000 meters
+- Accuracy: 0 to 1000 meters
+
+Battery Validation:
+- Level: 0 to 100 (percentage)
+- Voltage: 2500 to 4500 (millivolts for LiPo)
+- Temperature: -40 to 85 (Celsius)
+
+Alert Validation:
+- Type: Must be valid enum value
+- Severity: 1 (critical) to 4 (low)
+- Message length: Max 100 characters
+
+Device ID:
+- Must be unique uint32
+- Reserved ranges: 0x00000000 (invalid), 0xFFFFFFFF (broadcast)
+
+================================================================================
+                         14. ERROR HANDLING
+================================================================================
+
+Error Codes for Mesh Communication:
++-------------------+------------+------------------------------------------+
+| Code              | Value      | Description                              |
++-------------------+------------+------------------------------------------+
+| SUCCESS           | 0x00       | Message delivered successfully           |
+| TIMEOUT           | 0x01       | No acknowledgment received               |
+| INVALID_DEST      | 0x02       | Destination device not found             |
+| PAYLOAD_TOO_LARGE | 0x03       | Message exceeds max size                 |
+| CHANNEL_BUSY      | 0x04       | Channel utilization too high             |
+| NO_ROUTE          | 0x05       | No mesh path to destination              |
+| AUTH_FAILED       | 0x06       | Encryption/authentication failure        |
+| BATTERY_LOW       | 0x07       | Device battery too low to transmit       |
++-------------------+------------+------------------------------------------+
+
+================================================================================
+                         15. QUICK REFERENCE SUMMARY
+================================================================================
+
+CRITICAL DATA FOR MESHTASTIC:
+1. Device ID: 4 bytes (uint32)
+2. Location: 8 bytes (2x int32 for lat/lng)
+3. Battery: 1 byte (uint8 percentage)
+4. Status: 1 byte (enum)
+5. Timestamp: 4 bytes (uint32 unix time)
+6. Alert Type: 1 byte (enum)
+7. Severity: 1 byte (enum)
+
+MINIMUM VIABLE PACKET: 18 bytes
+- device_id (4) + lat (4) + lng (4) + battery (1) + status (1) + timestamp (4)
+
+MAXIMUM PACKET SIZE: 237 bytes (Meshtastic limit)
+
+UPDATE FREQUENCIES:
+- Location: Every 20-60 seconds (configurable)
+- Telemetry: Every 2-5 minutes
+- Heartbeat: Every 5 minutes
+- SOS: Immediate on trigger
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================
+
+Document Version: 1.0
+Last Updated: 2026-02-05
+Project: Nishan-e-Zindagi FYP
+Contact: [Your contact info]
+
+================================================================================
