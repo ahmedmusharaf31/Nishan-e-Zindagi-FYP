@@ -85,13 +85,35 @@ export interface Campaign {
   updatedAt: string;
 }
 
+// Sensor reading types
+export type SurvivorProbability = 'high' | 'moderate' | 'low' | 'none';
+
+export interface SensorReading {
+  deviceId: string;
+  co2: number;
+  temperature: number;
+  humidity: number;
+  latitude: number;
+  longitude: number;
+  gpsFix: number;
+  timestamp: number;
+  receivedAt: string;
+}
+
+export interface ThresholdSettings {
+  co2Threshold: number;
+}
+
 // WebSocket message types
 export type WebSocketMessageType =
   | 'device_update'
   | 'alert_new'
   | 'alert_update'
   | 'campaign_update'
-  | 'connection_status';
+  | 'connection_status'
+  | 'sensor_data'
+  | 'telemetry'
+  | 'ping';
 
 export interface WebSocketMessage<T = unknown> {
   type: WebSocketMessageType;
@@ -104,6 +126,31 @@ export interface DeviceUpdatePayload {
   status?: DeviceStatus;
   batteryLevel?: number;
   location?: DeviceLocation;
+}
+
+export interface SensorDataPayload {
+  deviceId: string;
+  from: string;
+  nodeNum: number;
+  co2: number;
+  temperature: number;
+  humidity: number;
+  latitude: number;
+  longitude: number;
+  gpsFix: number;
+  timestamp: number;
+}
+
+export interface TelemetryPayload {
+  from: string;
+  nodeNum: number;
+  subtype: 'device' | 'environment';
+  battery?: number;
+  voltage?: number;
+  uptime?: number;
+  temperature?: number;
+  humidity?: number;
+  pressure?: number;
 }
 
 export interface AlertPayload {

@@ -27,7 +27,8 @@
       "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" log --oneline -5)",
       "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" add data_requirements.txt)",
       "Bash(git -C \"C:\\\\Users\\\\ahmed\\\\Downloads\\\\Nishan-e-Zindagi-FYP\" commit -m \"$\\(cat <<''EOF''\nAdd data requirements documentation for Meshtastic integration\n\nComprehensive specification covering message formats, GPS/location data,\nbattery telemetry, SOS alerts, device status, and hardware recommendations\nfor LoRa mesh network devices.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx next build:*)"
     ]
   }
 }

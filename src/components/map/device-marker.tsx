@@ -2,12 +2,13 @@
 
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { Device, DeviceStatus } from '@/types';
+import { Device, DeviceStatus, SurvivorProbability } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Battery, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { Battery, Wifi, WifiOff, AlertTriangle, Wind, Thermometer, Droplets } from 'lucide-react';
+import { useSensorStore } from '@/store';
 
-// Status color mapping
+// Status color mapping (fallback when no sensor data)
 const statusColors: Record<DeviceStatus, string> = {
   online: '#22c55e',    // green-500
   offline: '#ef4444',   // red-500
@@ -15,35 +16,61 @@ const statusColors: Record<DeviceStatus, string> = {
   critical: '#dc2626',  // red-600
 };
 
-// Create custom marker icon based on status
-function createMarkerIcon(status: DeviceStatus): L.DivIcon {
-  const color = statusColors[status];
+// Survivor probability color mapping
+const probabilityColors: Record<SurvivorProbability, string> = {
+  high: '#ef4444',      // red-500
+  moderate: '#f97316',  // orange-500
+  low: '#eab308',       // yellow-500
+  none: '#22c55e',      // green-500
+};
+
+const probabilityLabels: Record<SurvivorProbability, string> = {
+  high: 'HIGH Survivor Probability',
+  moderate: 'MODERATE Probability',
+  low: 'LOW Probability',
+  none: 'No Likely Survivor',
+};
+
+// Create custom marker icon based on survivor probability or device status
+function createMarkerIcon(status: DeviceStatus, probability?: SurvivorProbability): L.DivIcon {
+  const hasSensor = probability && probability !== undefined;
+  const color = hasSensor ? probabilityColors[probability] : statusColors[status];
+  const isPulsing = probability === 'high' || probability === 'moderate';
 
   return L.divIcon({
     className: 'custom-marker',
     html: `
       <div style="
         background-color: ${color};
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         border-radius: 50%;
         border: 3px solid white;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         display: flex;
         align-items: center;
         justify-content: center;
+        ${isPulsing ? 'animation: pulse 1.5s ease-in-out infinite;' : ''}
       ">
         <div style="
-          width: 8px;
-          height: 8px;
+          width: 10px;
+          height: 10px;
           background-color: white;
           border-radius: 50%;
         "></div>
       </div>
+      ${isPulsing ? `
+        <style>
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.8; }
+          }
+        </style>
+      ` : ''}
     `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
   });
 }
 
@@ -53,7 +80,11 @@ interface DeviceMarkerProps {
 }
 
 export function DeviceMarker({ device, onClick }: DeviceMarkerProps) {
-  const icon = createMarkerIcon(device.status);
+  const { getLatestReading, getSurvivorProbability } = useSensorStore();
+  const reading = getLatestReading(device.id);
+  const probability = getSurvivorProbability(device.id);
+
+  const icon = createMarkerIcon(device.status, reading ? probability : undefined);
   const position: [number, number] = [device.location.latitude, device.location.longitude];
 
   const statusVariant = {
@@ -75,7 +106,7 @@ export function DeviceMarker({ device, onClick }: DeviceMarkerProps) {
       }}
     >
       <Popup>
-        <div className="min-w-[200px] p-1">
+        <div className="min-w-[220px] p-1">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-sm">{device.name}</h3>
             <Badge variant={statusVariant[device.status]} className="text-xs">
@@ -83,6 +114,42 @@ export function DeviceMarker({ device, onClick }: DeviceMarkerProps) {
               {device.status}
             </Badge>
           </div>
+
+          {/* Survivor Probability Badge */}
+          {reading && (
+            <div className="mb-2">
+              <div
+                className="text-xs font-bold px-2 py-1 rounded text-white text-center"
+                style={{ backgroundColor: probabilityColors[probability] }}
+              >
+                {probabilityLabels[probability]}
+              </div>
+            </div>
+          )}
+
+          {/* Sensor Readings */}
+          {reading && (
+            <div className="space-y-1 text-xs mb-2 p-2 bg-muted/50 rounded">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Wind className="w-3 h-3" /> CO2
+                </span>
+                <span className="font-mono font-bold">{reading.co2} ppm</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Thermometer className="w-3 h-3" /> Temp
+                </span>
+                <span className="font-mono">{reading.temperature}°C</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Droplets className="w-3 h-3" /> Humidity
+                </span>
+                <span className="font-mono">{reading.humidity}%</span>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">

@@ -34,7 +34,7 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <WebSocketProvider autoConnect={true} enableNotifications={true}>
+      <WebSocketProvider autoConnect={true}>
         <div className="min-h-screen bg-background">
           {/* Desktop Sidebar */}
           <Sidebar />

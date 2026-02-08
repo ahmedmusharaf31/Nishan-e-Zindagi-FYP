@@ -1,13 +1,12 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { MockWebSocketClient, MockConnectionStatus } from '@/lib/websocket/mock-websocket-client';
-import { DeviceUpdatePayload, AlertPayload } from '@/types';
-import { useDeviceStore, useAlertStore } from '@/store';
-import { useToast } from '@/components/ui/use-toast';
+import { WebSocketClient, ConnectionStatus } from '@/lib/websocket/websocket-client';
+import { SensorDataPayload, TelemetryPayload, SensorReading } from '@/types';
+import { useDeviceStore, useSensorStore } from '@/store';
 
 interface WebSocketContextValue {
-  status: MockConnectionStatus;
+  status: ConnectionStatus;
   connect: () => void;
   disconnect: () => void;
   isConnected: boolean;
@@ -18,67 +17,105 @@ const WebSocketContext = createContext<WebSocketContextValue | undefined>(undefi
 interface WebSocketProviderProps {
   children: ReactNode;
   autoConnect?: boolean;
-  enableNotifications?: boolean;
+  wsUrl?: string;
 }
 
 export function WebSocketProvider({
   children,
   autoConnect = true,
-  enableNotifications = true,
+  wsUrl = 'ws://localhost:8000/ws',
 }: WebSocketProviderProps) {
-  const [client, setClient] = useState<MockWebSocketClient | null>(null);
-  const [status, setStatus] = useState<MockConnectionStatus>('disconnected');
-  const { updateDevice } = useDeviceStore();
-  const { addAlert } = useAlertStore();
-  const { toast } = useToast();
+  const [client, setClient] = useState<WebSocketClient | null>(null);
+  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+  const { updateDevice, addDevice } = useDeviceStore();
+  const { addReading } = useSensorStore();
 
-  // Handle device updates
-  const handleDeviceUpdate = useCallback(
-    async (payload: DeviceUpdatePayload) => {
-      await updateDevice(payload.deviceId, {
-        status: payload.status,
-        batteryLevel: payload.batteryLevel,
-        location: payload.location,
-        lastSeenAt: new Date().toISOString(),
-      });
+  // Handle sensor data from mesh nodes
+  const handleSensorData = useCallback(
+    (payload: SensorDataPayload) => {
+      const reading: SensorReading = {
+        deviceId: payload.deviceId,
+        co2: payload.co2,
+        temperature: payload.temperature,
+        humidity: payload.humidity,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        gpsFix: payload.gpsFix,
+        timestamp: payload.timestamp,
+        receivedAt: new Date().toISOString(),
+      };
+      addReading(reading);
+
+      // Auto-create or update device entry from sensor data
+      const existingDevice = useDeviceStore.getState().devices.find(
+        (d) => d.id === payload.deviceId
+      );
+      if (existingDevice) {
+        updateDevice(payload.deviceId, {
+          location: { latitude: payload.latitude, longitude: payload.longitude },
+          lastSeenAt: new Date().toISOString(),
+          status: 'online',
+        });
+      } else {
+        addDevice({
+          id: payload.deviceId,
+          name: payload.deviceId,
+          status: 'online',
+          batteryLevel: 100,
+          location: { latitude: payload.latitude, longitude: payload.longitude },
+          lastSeenAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        });
+      }
+    },
+    [addReading, updateDevice, addDevice]
+  );
+
+  // Handle telemetry data (battery, voltage, environment)
+  const handleTelemetry = useCallback(
+    (payload: TelemetryPayload) => {
+      if (payload.subtype === 'device' && payload.battery !== undefined) {
+        // Find device by node number or name - update battery
+        const deviceStore = useDeviceStore.getState();
+        const device = deviceStore.devices.find(
+          (d) => d.name === payload.from || d.id === payload.from
+        );
+        if (device) {
+          const batteryStatus = payload.battery < 20 ? 'warning' as const : 'online' as const;
+          updateDevice(device.id, {
+            batteryLevel: payload.battery,
+            status: batteryStatus,
+            lastSeenAt: new Date().toISOString(),
+          });
+        }
+      }
     },
     [updateDevice]
   );
 
-  // Handle new alerts
-  const handleNewAlert = useCallback(
-    async (payload: AlertPayload) => {
-      await addAlert(payload.alert);
-
-      // Show toast notification for new alerts
-      if (enableNotifications) {
-        toast({
-          title: payload.alert.title,
-          description: payload.alert.description || `New ${payload.alert.severity} alert`,
-          variant: payload.alert.severity === 'critical' ? 'destructive' : 'default',
-        });
-      }
-    },
-    [addAlert, enableNotifications, toast]
-  );
-
   // Handle status changes
-  const handleStatusChange = useCallback((newStatus: MockConnectionStatus) => {
+  const handleStatusChange = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
+    if (newStatus === 'connected') {
+      console.log('WebSocket connected to backend');
+    } else if (newStatus === 'error') {
+      console.warn('WebSocket connection error');
+    }
   }, []);
 
   // Initialize client
   useEffect(() => {
-    const wsClient = new MockWebSocketClient({
+    const wsClient = new WebSocketClient({
+      url: wsUrl,
+      reconnectInterval: 5000,
+      maxReconnectAttempts: 50,
       onStatusChange: handleStatusChange,
-      onDeviceUpdate: handleDeviceUpdate,
-      onNewAlert: handleNewAlert,
-      updateInterval: 20000, // Update every 20 seconds
+      onSensorData: handleSensorData,
+      onTelemetry: handleTelemetry,
     });
 
     setClient(wsClient);
 
-    // Auto connect if enabled
     if (autoConnect) {
       wsClient.connect();
     }
@@ -86,14 +123,12 @@ export function WebSocketProvider({
     return () => {
       wsClient.disconnect();
     };
-  }, [autoConnect, handleDeviceUpdate, handleNewAlert, handleStatusChange]);
+  }, [autoConnect, wsUrl, handleSensorData, handleTelemetry, handleStatusChange]);
 
-  // Connect function
   const connect = useCallback(() => {
     client?.connect();
   }, [client]);
 
-  // Disconnect function
   const disconnect = useCallback(() => {
     client?.disconnect();
   }, [client]);

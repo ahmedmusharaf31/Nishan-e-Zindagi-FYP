@@ -3,6 +3,8 @@ import {
   DeviceUpdatePayload,
   AlertPayload,
   CampaignPayload,
+  SensorDataPayload,
+  TelemetryPayload,
 } from '@/types';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -17,6 +19,8 @@ export interface WebSocketClientOptions {
   onNewAlert?: (payload: AlertPayload) => void;
   onAlertUpdate?: (payload: AlertPayload) => void;
   onCampaignUpdate?: (payload: CampaignPayload) => void;
+  onSensorData?: (payload: SensorDataPayload) => void;
+  onTelemetry?: (payload: TelemetryPayload) => void;
 }
 
 export class WebSocketClient {
@@ -62,8 +66,8 @@ export class WebSocketClient {
 
       this.ws.onmessage = (event) => {
         try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          this.handleMessage(message);
+          const data = JSON.parse(event.data);
+          this.handleRawMessage(data);
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
         }
@@ -116,23 +120,60 @@ export class WebSocketClient {
     }, this.reconnectInterval);
   }
 
-  private handleMessage(message: WebSocketMessage): void {
-    // Call general message handler
-    this.options.onMessage?.(message);
+  // Handle raw messages from backend (flat JSON with "type" field)
+  private handleRawMessage(data: Record<string, unknown>): void {
+    const msgType = data.type as string;
 
-    // Call specific handlers based on message type
-    switch (message.type) {
+    // Wrap as WebSocketMessage for the general handler
+    const wrapped: WebSocketMessage = {
+      type: msgType as WebSocketMessage['type'],
+      payload: data,
+      timestamp: new Date().toISOString(),
+    };
+    this.options.onMessage?.(wrapped);
+
+    switch (msgType) {
+      case 'sensor_data':
+        this.options.onSensorData?.({
+          deviceId: data.device_id as string,
+          from: data.from as string,
+          nodeNum: data.node_num as number,
+          co2: data.co2 as number,
+          temperature: data.temperature as number,
+          humidity: data.humidity as number,
+          latitude: data.latitude as number,
+          longitude: data.longitude as number,
+          gpsFix: data.gps_fix as number,
+          timestamp: data.timestamp as number,
+        });
+        break;
+      case 'telemetry':
+        this.options.onTelemetry?.({
+          from: data.from as string,
+          nodeNum: data.node_num as number,
+          subtype: data.subtype as 'device' | 'environment',
+          battery: data.battery as number | undefined,
+          voltage: data.voltage as number | undefined,
+          uptime: data.uptime as number | undefined,
+          temperature: data.temperature as number | undefined,
+          humidity: data.humidity as number | undefined,
+          pressure: data.pressure as number | undefined,
+        });
+        break;
       case 'device_update':
-        this.options.onDeviceUpdate?.(message.payload as DeviceUpdatePayload);
+        this.options.onDeviceUpdate?.(data.payload as DeviceUpdatePayload);
         break;
       case 'alert_new':
-        this.options.onNewAlert?.(message.payload as AlertPayload);
+        this.options.onNewAlert?.(data.payload as AlertPayload);
         break;
       case 'alert_update':
-        this.options.onAlertUpdate?.(message.payload as AlertPayload);
+        this.options.onAlertUpdate?.(data.payload as AlertPayload);
         break;
       case 'campaign_update':
-        this.options.onCampaignUpdate?.(message.payload as CampaignPayload);
+        this.options.onCampaignUpdate?.(data.payload as CampaignPayload);
+        break;
+      case 'ping':
+        // Heartbeat from server, ignore
         break;
     }
   }
