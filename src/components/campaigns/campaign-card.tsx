@@ -17,6 +17,8 @@ import {
   MessageSquare,
   ChevronRight,
   User,
+  Radio,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -100,6 +102,10 @@ export function CampaignCard({
   const StatusIcon = status.icon;
   const isActive = !['resolved', 'cancelled'].includes(campaign.status);
 
+  const nodeCount = campaign.nodeAssignments?.length || 0;
+  const rescuedNodeCount = campaign.nodeAssignments?.filter(n => n.status === 'rescued').length || 0;
+  const rescuerCount = campaign.assignedRescuerIds?.length || (campaign.assignedRescuerId ? 1 : 0);
+
   // Get the next available status transitions
   const getNextStatus = (): CampaignStatus | null => {
     const transitions: Partial<Record<CampaignStatus, CampaignStatus>> = {
@@ -134,8 +140,8 @@ export function CampaignCard({
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-center justify-between gap-2 mb-1">
-              <h3 className="font-semibold text-sm">
-                Campaign #{campaign.id.slice(-6).toUpperCase()}
+              <h3 className="font-semibold text-sm truncate">
+                {campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`}
               </h3>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Badge
@@ -165,16 +171,34 @@ export function CampaignCard({
 
             {/* Meta info */}
             <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {rescuerName && (
+              {/* Node count + progress */}
+              {nodeCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <Radio className="w-3 h-3" />
+                  {rescuedNodeCount}/{nodeCount} nodes
+                </span>
+              )}
+              {/* Rescuer count */}
+              {rescuerCount > 0 ? (
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {rescuerCount} rescuer{rescuerCount !== 1 ? 's' : ''}
+                </span>
+              ) : rescuerName ? (
                 <span className="flex items-center gap-1">
                   <User className="w-3 h-3" />
                   {rescuerName}
                 </span>
-              )}
-              {!rescuerName && campaign.status === 'initiated' && (
+              ) : campaign.status === 'initiated' ? (
                 <span className="flex items-center gap-1 text-amber-600">
                   <User className="w-3 h-3" />
                   Unassigned
+                </span>
+              ) : null}
+              {/* Survivors */}
+              {(campaign.totalSurvivorsFound || 0) > 0 && (
+                <span className="flex items-center gap-1 text-green-600 font-medium">
+                  {campaign.totalSurvivorsFound} survivor{campaign.totalSurvivorsFound !== 1 ? 's' : ''}
                 </span>
               )}
               <span className="flex items-center gap-1">

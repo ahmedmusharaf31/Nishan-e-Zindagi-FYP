@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { RoleGuard } from '@/components/auth';
 import { AlertCard } from '@/components/alerts';
-import { useAlertStore, useDeviceStore } from '@/store';
+import { useAlertStore, useDeviceStore, useCampaignStore } from '@/store';
 import { useWebSocket } from '@/providers/websocket-provider';
 import { AlertSeverity, AlertStatus } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -24,11 +24,16 @@ import {
   RefreshCcw,
   AlertTriangle,
   Info,
+  HeartPulse,
+  Megaphone,
+  ShieldAlert,
+  CheckCircle,
 } from 'lucide-react';
 
 export default function PublicAlertsPage() {
   const { alerts, fetchAlerts } = useAlertStore();
   const { devices, fetchDevices } = useDeviceStore();
+  const { campaigns, fetchCampaigns } = useCampaignStore();
   const { isConnected } = useWebSocket();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -40,11 +45,11 @@ export default function PublicAlertsPage() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchAlerts(), fetchDevices()]);
+      await Promise.all([fetchAlerts(), fetchDevices(), fetchCampaigns()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchAlerts, fetchDevices]);
+  }, [fetchAlerts, fetchDevices, fetchCampaigns]);
 
   // Get device name helper
   const getDeviceName = useCallback((deviceId: string) => {
@@ -83,18 +88,28 @@ export default function PublicAlertsPage() {
     );
   }, [alerts, statusFilter, severityFilter, searchQuery, getDeviceName]);
 
-  // Stats
-  const stats = useMemo(() => ({
+  // Alert stats
+  const alertStats = useMemo(() => ({
     total: alerts.length,
     active: alerts.filter((a) => a.status === 'active').length,
     critical: alerts.filter((a) => a.severity === 'critical' && a.status === 'active').length,
     high: alerts.filter((a) => a.severity === 'high' && a.status === 'active').length,
   }), [alerts]);
 
+  // Campaign/rescue stats
+  const rescueStats = useMemo(() => {
+    const totalSurvivors = campaigns.reduce((sum, c) => sum + (c.totalSurvivorsFound || 0), 0);
+    const activeCampaigns = campaigns.filter(c => !['resolved', 'cancelled'].includes(c.status)).length;
+    const resolvedCampaigns = campaigns.filter(c => c.status === 'resolved');
+    const criticalAlerts = alerts.filter(a => a.severity === 'critical' && a.status === 'active').length;
+    const dangerLevel = criticalAlerts >= 3 ? 'High' : criticalAlerts >= 1 ? 'Moderate' : 'Low';
+    return { totalSurvivors, activeCampaigns, resolvedCampaigns, dangerLevel };
+  }, [campaigns, alerts]);
+
   // Refresh data
   const handleRefresh = async () => {
     setIsLoading(true);
-    await Promise.all([fetchAlerts(), fetchDevices()]);
+    await Promise.all([fetchAlerts(), fetchDevices(), fetchCampaigns()]);
     setIsLoading(false);
   };
 
@@ -109,7 +124,7 @@ export default function PublicAlertsPage() {
               Public Alerts
             </h1>
             <p className="text-muted-foreground">
-              View active alerts and emergency notifications
+              View active alerts, rescue operations, and emergency notifications
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -148,33 +163,124 @@ export default function PublicAlertsPage() {
           </CardContent>
         </Card>
 
-        {/* Stats Cards */}
+        {/* Rescue Stats Section */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
+          <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-sm text-muted-foreground">Total Alerts</p>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/50">
+                  <HeartPulse className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-700 dark:text-green-400">{rescueStats.totalSurvivors}</div>
+                  <p className="text-sm text-green-600 dark:text-green-500">Total Persons Rescued</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-amber-600">{stats.active}</div>
-              <p className="text-sm text-muted-foreground">Active</p>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Megaphone className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{rescueStats.activeCampaigns}</div>
+                  <p className="text-sm text-muted-foreground">Active Operations</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
-              <p className="text-sm text-muted-foreground">Critical</p>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  rescueStats.dangerLevel === 'High' ? 'bg-red-100 dark:bg-red-900/30' :
+                  rescueStats.dangerLevel === 'Moderate' ? 'bg-amber-100 dark:bg-amber-900/30' :
+                  'bg-green-100 dark:bg-green-900/30'
+                }`}>
+                  <ShieldAlert className={`w-5 h-5 ${
+                    rescueStats.dangerLevel === 'High' ? 'text-red-600' :
+                    rescueStats.dangerLevel === 'Moderate' ? 'text-amber-600' :
+                    'text-green-600'
+                  }`} />
+                </div>
+                <div>
+                  <div className={`text-2xl font-bold ${
+                    rescueStats.dangerLevel === 'High' ? 'text-red-600' :
+                    rescueStats.dangerLevel === 'Moderate' ? 'text-amber-600' :
+                    'text-green-600'
+                  }`}>{rescueStats.dangerLevel}</div>
+                  <p className="text-sm text-muted-foreground">Danger Level</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-600">{stats.high}</div>
-              <p className="text-sm text-muted-foreground">High Priority</p>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-600">{alertStats.active}</div>
+                  <p className="text-sm text-muted-foreground">Active Alerts</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Resolved Campaigns */}
+        {rescueStats.resolvedCampaigns.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                Resolved Rescue Operations
+              </CardTitle>
+              <CardDescription>
+                Completed campaigns and their outcomes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {rescueStats.resolvedCampaigns.map((campaign) => (
+                  <div
+                    key={campaign.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-md bg-green-100 dark:bg-green-900/30">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Resolved {new Date(campaign.resolvedAt || campaign.updatedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      {(campaign.totalSurvivorsFound || 0) > 0 && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <HeartPulse className="w-3 h-3 mr-1" />
+                          {campaign.totalSurvivorsFound} rescued
+                        </Badge>
+                      )}
+                      <Badge variant="outline">
+                        {campaign.nodeAssignments?.filter(n => n.status === 'rescued').length || 0}/
+                        {campaign.nodeAssignments?.length || 0} nodes
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filters */}
         <Card>

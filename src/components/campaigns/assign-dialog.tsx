@@ -13,15 +13,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, User as UserIcon, MapPin } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -30,46 +24,63 @@ interface AssignDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAssigned?: () => void;
+  nodeId?: string;
 }
 
-export function AssignDialog({ campaign, open, onOpenChange, onAssigned }: AssignDialogProps) {
+export function AssignDialog({ campaign, open, onOpenChange, onAssigned, nodeId }: AssignDialogProps) {
   const { fetchUsers, getUsersByRole } = useUserStore();
-  const { assignCampaign } = useCampaignStore();
+  const { assignCampaign, assignNodeToRescuers } = useCampaignStore();
   const { toast } = useToast();
-  const [selectedRescuerId, setSelectedRescuerId] = useState<string>('');
+  const [selectedRescuerIds, setSelectedRescuerIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch users when dialog opens
   useEffect(() => {
     if (open) {
       fetchUsers();
     }
   }, [open, fetchUsers]);
 
-  // Reset selection when campaign changes
   useEffect(() => {
-    setSelectedRescuerId('');
-  }, [campaign]);
+    if (campaign && nodeId) {
+      const node = campaign.nodeAssignments?.find(n => n.nodeId === nodeId);
+      setSelectedRescuerIds(node?.assignedRescuerIds || []);
+    } else {
+      setSelectedRescuerIds(campaign?.assignedRescuerIds || []);
+    }
+  }, [campaign, nodeId]);
 
-  // Get available rescuers
   const rescuers = getUsersByRole('rescuer').filter((u) => u.isActive);
 
+  const toggleRescuer = (rescuerId: string) => {
+    setSelectedRescuerIds(prev =>
+      prev.includes(rescuerId) ? prev.filter(id => id !== rescuerId) : [...prev, rescuerId]
+    );
+  };
+
   const handleAssign = async () => {
-    if (!campaign || !selectedRescuerId) return;
+    if (!campaign || selectedRescuerIds.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      await assignCampaign(campaign.id, selectedRescuerId);
-      toast({
-        title: 'Campaign Assigned',
-        description: 'The campaign has been assigned to the selected rescuer.',
-      });
+      if (nodeId) {
+        await assignNodeToRescuers(campaign.id, nodeId, selectedRescuerIds);
+        toast({
+          title: 'Rescuers Assigned to Node',
+          description: `${selectedRescuerIds.length} rescuer(s) assigned to node.`,
+        });
+      } else {
+        await assignCampaign(campaign.id, selectedRescuerIds);
+        toast({
+          title: 'Campaign Assigned',
+          description: `${selectedRescuerIds.length} rescuer(s) assigned to campaign.`,
+        });
+      }
       onOpenChange(false);
       onAssigned?.();
     } catch {
       toast({
         title: 'Error',
-        description: 'Failed to assign campaign. Please try again.',
+        description: 'Failed to assign. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -77,15 +88,15 @@ export function AssignDialog({ campaign, open, onOpenChange, onAssigned }: Assig
     }
   };
 
-  const selectedRescuer = rescuers.find((r) => r.id === selectedRescuerId);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Assign Campaign</DialogTitle>
+          <DialogTitle>{nodeId ? 'Assign Rescuers to Node' : 'Assign Campaign'}</DialogTitle>
           <DialogDescription>
-            Select a rescuer to assign this campaign to.
+            {nodeId
+              ? 'Select rescuers to assign to this node.'
+              : 'Select rescuers to assign to this campaign.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -95,7 +106,7 @@ export function AssignDialog({ campaign, open, onOpenChange, onAssigned }: Assig
             <div className="p-3 bg-muted rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">
-                  Campaign #{campaign.id.slice(-6).toUpperCase()}
+                  {campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`}
                 </span>
                 <Badge variant="outline">
                   {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
@@ -107,46 +118,40 @@ export function AssignDialog({ campaign, open, onOpenChange, onAssigned }: Assig
               </div>
             </div>
 
-            {/* Rescuer Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="rescuer">Select Rescuer</Label>
-              {rescuers.length === 0 ? (
-                <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg text-center">
-                  No active rescuers available
-                </div>
-              ) : (
-                <Select value={selectedRescuerId} onValueChange={setSelectedRescuerId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a rescuer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rescuers.map((rescuer) => (
-                      <SelectItem key={rescuer.id} value={rescuer.id}>
-                        <div className="flex items-center gap-2">
-                          <UserIcon className="w-4 h-4" />
-                          <span>{rescuer.displayName}</span>
+            {/* Rescuer Selection - Multi-select */}
+            <ScrollArea className="h-[250px]">
+              <div className="space-y-2 pr-4">
+                {rescuers.length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg text-center">
+                    No active rescuers available
+                  </div>
+                ) : (
+                  rescuers.map((rescuer) => {
+                    const isSelected = selectedRescuerIds.includes(rescuer.id);
+                    return (
+                      <div
+                        key={rescuer.id}
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                          isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+                        }`}
+                        onClick={() => toggleRescuer(rescuer.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox checked={isSelected} />
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <UserIcon className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{rescuer.displayName}</p>
+                            <p className="text-xs text-muted-foreground">{rescuer.email}</p>
+                          </div>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {/* Selected Rescuer Info */}
-            {selectedRescuer && (
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <UserIcon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{selectedRescuer.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{selectedRescuer.email}</p>
-                  </div>
-                </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            )}
+            </ScrollArea>
           </div>
         )}
 
@@ -156,7 +161,7 @@ export function AssignDialog({ campaign, open, onOpenChange, onAssigned }: Assig
           </Button>
           <Button
             onClick={handleAssign}
-            disabled={!selectedRescuerId || isSubmitting}
+            disabled={selectedRescuerIds.length === 0 || isSubmitting}
           >
             {isSubmitting ? (
               <>
@@ -164,7 +169,7 @@ export function AssignDialog({ campaign, open, onOpenChange, onAssigned }: Assig
                 Assigning...
               </>
             ) : (
-              'Assign Campaign'
+              `Assign ${selectedRescuerIds.length} Rescuer${selectedRescuerIds.length !== 1 ? 's' : ''}`
             )}
           </Button>
         </DialogFooter>

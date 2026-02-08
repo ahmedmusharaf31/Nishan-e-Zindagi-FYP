@@ -1,16 +1,20 @@
 "use client";
 
+import { useState } from 'react';
 import { RoleGuard } from '@/components/auth';
 import { StatsCard } from '@/components/dashboard';
 import { DeviceGrid } from '@/components/devices';
+import { CreateCampaignDialog } from '@/components/campaigns';
 import { useUserStore, useDeviceStore, useAlertStore, useCampaignStore } from '@/store';
-import { Users, Radio, Bell, Megaphone } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, Radio, Bell, Megaphone, Plus } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const { users } = useUserStore();
   const { devices } = useDeviceStore();
   const { getActiveAlerts } = useAlertStore();
-  const { getActiveCampaigns } = useCampaignStore();
+  const { getActiveCampaigns, fetchCampaigns } = useCampaignStore();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const activeAlerts = getActiveAlerts();
   const activeCampaigns = getActiveCampaigns();
@@ -20,11 +24,17 @@ export default function AdminDashboardPage() {
     <RoleGuard allowedRoles={['admin']} fallbackUrl="/rescuer">
       <div className="space-y-6">
         {/* Page Header */}
-        <div>
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">
-            System overview and device monitoring
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+            <p className="text-muted-foreground">
+              System overview and device monitoring
+            </p>
+          </div>
+          <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Start Campaign
+          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -57,6 +67,13 @@ export default function AdminDashboardPage() {
 
         {/* Device Grid */}
         <DeviceGrid />
+
+        {/* Create Campaign Dialog */}
+        <CreateCampaignDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          onCreated={() => fetchCampaigns()}
+        />
       </div>
     </RoleGuard>
   );

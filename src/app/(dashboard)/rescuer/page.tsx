@@ -5,6 +5,7 @@ import { RoleGuard } from '@/components/auth';
 import { DynamicMapView, DeviceMarkers } from '@/components/map';
 import { AlertList } from '@/components/alerts';
 import { StatsCard } from '@/components/dashboard';
+import { CreateCampaignDialog } from '@/components/campaigns';
 import { useDeviceStore, useAlertStore, useCampaignStore, useSensorStore } from '@/store';
 import { useAuth } from '@/providers/auth-provider';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -24,6 +25,7 @@ import {
   Droplets,
   Settings2,
   Target,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -57,6 +59,8 @@ export default function RescuerDashboardPage() {
   const [mapCenter, setMapCenter] = useState<[number, number]>([30.3753, 69.3451]);
   const [isLoading, setIsLoading] = useState(true);
   const [thresholdInput, setThresholdInput] = useState(String(thresholds.co2Threshold));
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const isAdmin = userProfile?.role === 'admin';
 
   // Fetch data on mount
   useEffect(() => {
@@ -129,15 +133,23 @@ export default function RescuerDashboardPage() {
               Monitor devices, sensor data, and respond to alerts
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isLoading}
-          >
-            <RefreshCcw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Start Campaign
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCcw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -326,6 +338,14 @@ export default function RescuerDashboardPage() {
             </CardContent>
           </Card>
         </div>
+        {/* Create Campaign Dialog */}
+        {isAdmin && (
+          <CreateCampaignDialog
+            open={showCreateDialog}
+            onOpenChange={setShowCreateDialog}
+            onCreated={() => {}}
+          />
+        )}
       </div>
     </RoleGuard>
   );

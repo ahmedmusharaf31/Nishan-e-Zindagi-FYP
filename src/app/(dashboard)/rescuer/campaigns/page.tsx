@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth';
-import { CampaignCard, AssignDialog } from '@/components/campaigns';
+import { CampaignCard, AssignDialog, CreateCampaignDialog } from '@/components/campaigns';
+import { StatsCard } from '@/components/dashboard';
 import { useCampaignStore, useUserStore } from '@/store';
 import { useAuth } from '@/providers/auth-provider';
 import { Campaign, CampaignStatus } from '@/types';
@@ -18,6 +19,10 @@ import {
   Megaphone,
   Search,
   RefreshCcw,
+  Plus,
+  Radio,
+  Users,
+  HeartPulse,
 } from 'lucide-react';
 
 type TabValue = 'all' | 'active' | 'mine' | 'unassigned' | 'resolved';
@@ -31,6 +36,7 @@ export default function CampaignsPage() {
     updateCampaignStatus,
     getActiveCampaigns,
     getCampaignsByRescuer,
+    getCampaignStats,
   } = useCampaignStore();
   const { users, fetchUsers } = useUserStore();
   const { toast } = useToast();
@@ -40,6 +46,7 @@ export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('all');
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const isAdmin = userProfile?.role === 'admin';
   const isRescuer = userProfile?.role === 'rescuer';
@@ -60,6 +67,9 @@ export default function CampaignsPage() {
     const rescuer = users.find((u) => u.id === rescuerId);
     return rescuer?.displayName;
   }, [users]);
+
+  // Campaign stats
+  const stats = getCampaignStats();
 
   // Filter campaigns based on tab and search
   const filteredCampaigns = useMemo(() => {
@@ -87,6 +97,7 @@ export default function CampaignsPage() {
       filtered = filtered.filter(
         (c) =>
           c.id.toLowerCase().includes(query) ||
+          c.name?.toLowerCase().includes(query) ||
           getRescuerName(c.assignedRescuerId)?.toLowerCase().includes(query)
       );
     }
@@ -152,15 +163,51 @@ export default function CampaignsPage() {
               Manage and track rescue campaigns
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isLoading}
-          >
-            <RefreshCcw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create Campaign
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCcw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Section */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title="Deployed Nodes"
+            value={stats.deployedNodes}
+            description="Active campaign nodes"
+            icon={Radio}
+          />
+          <StatsCard
+            title="Deployed Rescuers"
+            value={stats.deployedRescuers}
+            description="In active campaigns"
+            icon={Users}
+          />
+          <StatsCard
+            title="Active Campaigns"
+            value={stats.activeCampaigns}
+            description={`${stats.totalCampaigns} total`}
+            icon={Megaphone}
+          />
+          <StatsCard
+            title="Survivors Found"
+            value={stats.totalSurvivorsFound}
+            description={`${stats.resolvedCampaigns} resolved campaigns`}
+            icon={HeartPulse}
+          />
         </div>
 
         {/* Search and Filters */}
@@ -170,7 +217,7 @@ export default function CampaignsPage() {
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by ID or rescuer..."
+                  placeholder="Search by name, ID, or rescuer..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -220,7 +267,7 @@ export default function CampaignsPage() {
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-4">
-            <ScrollArea className="h-[calc(100vh-350px)]">
+            <ScrollArea className="h-[calc(100vh-500px)]">
               {filteredCampaigns.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center">
@@ -243,7 +290,10 @@ export default function CampaignsPage() {
                       onViewDetails={handleViewDetails}
                       onStatusChange={handleStatusChange}
                       onAssign={isAdmin ? handleAssignClick : undefined}
-                      isAssignedToMe={campaign.assignedRescuerId === userProfile?.id}
+                      isAssignedToMe={
+                        campaign.assignedRescuerIds?.includes(userProfile?.id || '') ||
+                        campaign.assignedRescuerId === userProfile?.id
+                      }
                       showActions={true}
                     />
                   ))}
@@ -263,6 +313,15 @@ export default function CampaignsPage() {
             fetchCampaigns();
           }}
         />
+
+        {/* Create Campaign Dialog */}
+        {isAdmin && (
+          <CreateCampaignDialog
+            open={showCreateDialog}
+            onOpenChange={setShowCreateDialog}
+            onCreated={() => fetchCampaigns()}
+          />
+        )}
       </div>
     </RoleGuard>
   );

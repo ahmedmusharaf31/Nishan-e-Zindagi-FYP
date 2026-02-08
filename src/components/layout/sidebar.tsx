@@ -40,7 +40,7 @@ const navItems: NavItem[] = [
     title: 'Map & Alerts',
     href: '/rescuer',
     icon: MapPin,
-    roles: ['rescuer'],
+    roles: ['rescuer', 'admin'],
   },
   {
     title: 'Campaigns',
@@ -58,7 +58,7 @@ const navItems: NavItem[] = [
     title: 'Reports',
     href: '/reports',
     icon: BarChart3,
-    roles: ['admin', 'rescuer'],
+    roles: ['admin', 'rescuer', 'public'],
   },
 ];
 

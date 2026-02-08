@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth';
-import { StatusTimeline, CampaignNotes, statusConfig } from '@/components/campaigns';
+import { StatusTimeline, CampaignNotes, statusConfig, AssignDialog } from '@/components/campaigns';
+import { NodeAssignmentCard } from '@/components/campaigns/node-assignment-card';
+import { RescueDialog } from '@/components/campaigns/rescue-dialog';
+import { ResolveCampaignDialog } from '@/components/campaigns/resolve-campaign-dialog';
 import { DynamicMapView, DeviceMarkers } from '@/components/map';
 import { useCampaignStore, useUserStore, useAlertStore, useDeviceStore } from '@/store';
 import { useAuth } from '@/providers/auth-provider';
-import { Campaign, CampaignStatus } from '@/types';
+import { Campaign, CampaignStatus, NodeAssignment, Device } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,12 +22,16 @@ import {
   MapPin,
   Clock,
   User,
+  Users,
   Activity,
   ChevronRight,
   XCircle,
   MessageSquare,
   History,
   AlertTriangle,
+  Radio,
+  CheckCircle,
+  HeartPulse,
 } from 'lucide-react';
 
 // Valid status transitions for action buttons
@@ -37,11 +44,11 @@ const nextStatusMap: Partial<Record<CampaignStatus, { status: CampaignStatus; la
 };
 
 interface CampaignDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function CampaignDetailPage({ params }: CampaignDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { userProfile } = useAuth();
   const {
@@ -50,6 +57,8 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
     getCampaignById,
     updateCampaignStatus,
     addCampaignNote,
+    markNodeRescued,
+    resolveCampaign,
   } = useCampaignStore();
   const { users, fetchUsers } = useUserStore();
   const { alerts, fetchAlerts } = useAlertStore();
@@ -58,6 +67,15 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
 
   const [isLoading, setIsLoading] = useState(true);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+
+  // Dialog states
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignNodeId, setAssignNodeId] = useState<string | undefined>();
+  const [rescueDialogOpen, setRescueDialogOpen] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<NodeAssignment | null>(null);
+  const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
+
+  const isAdmin = userProfile?.role === 'admin';
 
   // Fetch data on mount
   useEffect(() => {
@@ -78,34 +96,51 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   }, [id, campaigns, isLoading, getCampaignById]);
 
   // Get related data
-  const rescuer = campaign?.assignedRescuerId
-    ? users.find((u) => u.id === campaign.assignedRescuerId)
-    : null;
+  const rescuersList = campaign?.assignedRescuerIds?.map(rid =>
+    users.find(u => u.id === rid)
+  ).filter(Boolean) || [];
 
   const relatedAlert = campaign?.alertId
     ? alerts.find((a) => a.id === campaign.alertId)
     : null;
 
-  const relatedDevice = relatedAlert?.deviceId
-    ? devices.find((d) => d.id === relatedAlert.deviceId)
-    : null;
-
-  const isAssignedToMe = campaign?.assignedRescuerId === userProfile?.id;
+  const isAssignedToMe = campaign?.assignedRescuerIds?.includes(userProfile?.id || '') ||
+    campaign?.assignedRescuerId === userProfile?.id;
   const isActive = campaign && !['resolved', 'cancelled'].includes(campaign.status);
   const canTakeAction = isAssignedToMe && isActive;
   const nextAction = campaign ? nextStatusMap[campaign.status] : null;
 
+  const nodeCount = campaign?.nodeAssignments?.length || 0;
+  const rescuedNodeCount = campaign?.nodeAssignments?.filter(n => n.status === 'rescued').length || 0;
+  const allNodesRescued = nodeCount > 0 && rescuedNodeCount === nodeCount;
+
+  const getDeviceName = (deviceId: string) => {
+    return devices.find(d => d.id === deviceId)?.name || deviceId;
+  };
+
+  // Create map devices from node assignments
+  const mapDevices: Device[] = (campaign?.nodeAssignments || []).map(node => {
+    const device = devices.find(d => d.id === node.deviceId);
+    return {
+      id: node.deviceId || node.nodeId,
+      name: device?.name || node.nodeId,
+      status: node.status === 'rescued' ? 'online' : node.status === 'in_progress' ? 'warning' : 'critical',
+      batteryLevel: device?.batteryLevel || 100,
+      location: node.location,
+      lastSeenAt: device?.lastSeenAt || campaign?.createdAt || '',
+      createdAt: device?.createdAt || campaign?.createdAt || '',
+    };
+  });
+
   // Handle status change
   const handleStatusChange = async (newStatus: CampaignStatus) => {
     if (!campaign) return;
-
     try {
       await updateCampaignStatus(campaign.id, newStatus, undefined, userProfile?.displayName);
       toast({
         title: 'Status Updated',
         description: `Campaign status changed to ${newStatus.replace('_', ' ')}.`,
       });
-      // Refresh campaign data
       await fetchCampaigns();
     } catch {
       toast({
@@ -119,21 +154,46 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   // Handle add note
   const handleAddNote = async (content: string) => {
     if (!campaign || !userProfile) return;
-
     try {
       await addCampaignNote(campaign.id, content, userProfile.displayName);
-      toast({
-        title: 'Note Added',
-        description: 'Your note has been added to the campaign.',
-      });
+      toast({ title: 'Note Added', description: 'Your note has been added.' });
       await fetchCampaigns();
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to add note.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to add note.', variant: 'destructive' });
     }
+  };
+
+  // Handle assign rescuers to node
+  const handleAssignNode = (node: NodeAssignment) => {
+    setAssignNodeId(node.nodeId);
+    setAssignDialogOpen(true);
+  };
+
+  // Handle mark rescued
+  const handleMarkRescued = (node: NodeAssignment) => {
+    setSelectedNode(node);
+    setRescueDialogOpen(true);
+  };
+
+  const handleConfirmRescue = async (nodeId: string, survivorsFound: number) => {
+    if (!campaign || !userProfile) return;
+    await markNodeRescued(campaign.id, nodeId, userProfile.id, survivorsFound);
+    toast({
+      title: 'Node Rescued',
+      description: `Node marked as rescued. ${survivorsFound} survivor(s) found.`,
+    });
+    await fetchCampaigns();
+  };
+
+  // Handle resolve campaign
+  const handleResolveCampaign = async (note?: string) => {
+    if (!campaign || !userProfile) return;
+    await resolveCampaign(campaign.id, userProfile.displayName, note);
+    toast({
+      title: 'Campaign Resolved',
+      description: 'Campaign has been successfully resolved.',
+    });
+    await fetchCampaigns();
   };
 
   // Loading state
@@ -195,7 +255,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
-                  Campaign #{campaign.id.slice(-6).toUpperCase()}
+                  {campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`}
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant={isActive ? 'default' : 'outline'} className={status.color}>
@@ -207,18 +267,35 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
                   {isAssignedToMe && (
                     <Badge variant="secondary">Assigned to me</Badge>
                   )}
+                  {nodeCount > 0 && (
+                    <Badge variant="outline">
+                      <Radio className="w-3 h-3 mr-1" />
+                      {rescuedNodeCount}/{nodeCount} nodes
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          {canTakeAction && nextAction && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {isActive && (isAdmin || allNodesRescued) && (
+              <Button
+                onClick={() => setResolveDialogOpen(true)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Resolve Campaign
+              </Button>
+            )}
+            {canTakeAction && nextAction && nextAction.status !== 'resolved' && (
               <Button onClick={() => handleStatusChange(nextAction.status)}>
                 <ChevronRight className="w-4 h-4 mr-1" />
                 {nextAction.label}
               </Button>
+            )}
+            {isActive && (
               <Button
                 variant="outline"
                 className="text-destructive hover:text-destructive"
@@ -227,13 +304,13 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
                 <XCircle className="w-4 h-4 mr-1" />
                 Cancel
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Details and Map */}
+          {/* Left Column - Details, Nodes, and Map */}
           <div className="lg:col-span-2 space-y-6">
             {/* Campaign Details */}
             <Card>
@@ -257,36 +334,51 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Assigned Rescuer</p>
-                    <p className="font-medium flex items-center gap-1">
-                      <User className="w-4 h-4" />
-                      {rescuer?.displayName || 'Unassigned'}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Assigned Rescuers</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Users className="w-4 h-4" />
+                      {rescuersList.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {rescuersList.map(r => r && (
+                            <Badge key={r.id} variant="secondary" className="text-xs">
+                              {r.displayName}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-amber-600 text-sm">Unassigned</span>
+                      )}
+                    </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Location</p>
-                    <p className="font-medium flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {campaign.location.latitude.toFixed(4)}, {campaign.location.longitude.toFixed(4)}
+                    <p className="text-sm text-muted-foreground">Survivors Found</p>
+                    <p className="font-medium flex items-center gap-1 text-green-600">
+                      <HeartPulse className="w-4 h-4" />
+                      {campaign.totalSurvivorsFound || 0}
                     </p>
                   </div>
                 </div>
+
+                {campaign.description && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Description</p>
+                      <p className="text-sm">{campaign.description}</p>
+                    </div>
+                  </>
+                )}
 
                 {relatedAlert && (
                   <>
                     <Separator />
                     <div>
-                      <p className="text-sm text-muted-foreground mb-2">Related Alert</p>
+                      <p className="text-sm text-muted-foreground mb-2">Primary Alert</p>
                       <div className="p-3 bg-muted rounded-lg">
                         <p className="font-medium">{relatedAlert.title}</p>
                         {relatedAlert.description && (
                           <p className="text-sm text-muted-foreground mt-1">
                             {relatedAlert.description}
-                          </p>
-                        )}
-                        {relatedDevice && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Device: {relatedDevice.name}
                           </p>
                         )}
                       </div>
@@ -296,39 +388,64 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
               </CardContent>
             </Card>
 
+            {/* Node Assignments */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Radio className="w-5 h-5" />
+                    Node Assignments
+                  </CardTitle>
+                  <Badge variant="secondary">
+                    {rescuedNodeCount}/{nodeCount} rescued
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Manage individual node rescue operations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(campaign.nodeAssignments?.length || 0) === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Radio className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No nodes assigned</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {campaign.nodeAssignments.map(node => (
+                      <NodeAssignmentCard
+                        key={node.nodeId}
+                        node={node}
+                        deviceName={getDeviceName(node.deviceId)}
+                        rescuers={users}
+                        onAssignRescuers={isAdmin && isActive ? handleAssignNode : undefined}
+                        onMarkRescued={isAdmin && isActive ? handleMarkRescued : undefined}
+                        showActions={isActive ?? false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Location Map */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
-                  Location
+                  Node Locations
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <DynamicMapView
                   center={[campaign.location.latitude, campaign.location.longitude]}
-                  zoom={14}
+                  zoom={mapDevices.length > 1 ? 6 : 14}
                   className="h-[300px] w-full rounded-lg overflow-hidden"
                 >
-                  {relatedDevice ? (
-                    <DeviceMarkers
-                      devices={[relatedDevice]}
-                      onDeviceClick={() => {}}
-                    />
-                  ) : (
-                    <DeviceMarkers
-                      devices={[{
-                        id: 'campaign-location',
-                        name: `Campaign ${campaign.id.slice(-6).toUpperCase()}`,
-                        status: 'warning',
-                        batteryLevel: 100,
-                        location: campaign.location,
-                        lastSeenAt: campaign.createdAt,
-                        createdAt: campaign.createdAt,
-                      }]}
-                      onDeviceClick={() => {}}
-                    />
-                  )}
+                  <DeviceMarkers
+                    devices={mapDevices}
+                    onDeviceClick={() => {}}
+                  />
                 </DynamicMapView>
               </CardContent>
             </Card>
@@ -346,6 +463,40 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
               </CardHeader>
               <CardContent>
                 <StatusTimeline history={campaign.statusHistory} />
+              </CardContent>
+            </Card>
+
+            {/* Rescuers */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Rescuers
+                  <Badge variant="secondary" className="ml-auto">
+                    {rescuersList.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {rescuersList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No rescuers assigned
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {rescuersList.map(rescuer => rescuer && (
+                      <div key={rescuer.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{rescuer.displayName}</p>
+                          <p className="text-xs text-muted-foreground">{rescuer.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -377,6 +528,31 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           </div>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <AssignDialog
+        campaign={campaign}
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        nodeId={assignNodeId}
+        onAssigned={() => {
+          setAssignNodeId(undefined);
+          fetchCampaigns();
+        }}
+      />
+      <RescueDialog
+        node={selectedNode}
+        deviceName={selectedNode ? getDeviceName(selectedNode.deviceId) : undefined}
+        open={rescueDialogOpen}
+        onOpenChange={setRescueDialogOpen}
+        onConfirm={handleConfirmRescue}
+      />
+      <ResolveCampaignDialog
+        campaign={campaign}
+        open={resolveDialogOpen}
+        onOpenChange={setResolveDialogOpen}
+        onConfirm={handleResolveCampaign}
+      />
     </RoleGuard>
   );
 }

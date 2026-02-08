@@ -59,6 +59,8 @@ export type CampaignStatus =
   | 'resolved'
   | 'cancelled';
 
+export type NodeAssignmentStatus = 'pending' | 'assigned' | 'in_progress' | 'rescued';
+
 export interface CampaignStatusHistoryEntry {
   status: CampaignStatus;
   timestamp: string;
@@ -73,16 +75,56 @@ export interface CampaignNote {
   createdBy: string;
 }
 
+export interface NodeAssignment {
+  nodeId: string;
+  deviceId: string;
+  alertId: string;
+  assignedRescuerIds: string[];
+  location: DeviceLocation;
+  status: NodeAssignmentStatus;
+  rescuedAt?: string;
+  rescuedBy?: string;
+  survivorsFound?: number;
+}
+
 export interface Campaign {
   id: string;
-  alertId: string;
-  status: CampaignStatus;
+  // Legacy single-alert/single-rescuer fields (backward compat)
+  alertId?: string;
   assignedRescuerId?: string;
+  // New multi-node/multi-rescuer fields
+  name?: string;
+  description?: string;
+  alertIds: string[];
+  assignedRescuerIds: string[];
+  nodeAssignments: NodeAssignment[];
+  totalSurvivorsFound?: number;
+  resolvedAt?: string;
+  // Common fields
+  status: CampaignStatus;
   location: DeviceLocation;
   statusHistory: CampaignStatusHistoryEntry[];
   notes: CampaignNote[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CampaignStats {
+  deployedNodes: number;
+  deployedRescuers: number;
+  activeCampaigns: number;
+  totalSurvivorsFound: number;
+  resolvedCampaigns: number;
+  totalCampaigns: number;
+}
+
+export interface CampaignReport {
+  campaign: Campaign;
+  rescuerNames: Record<string, string>;
+  deviceNames: Record<string, string>;
+  alertDetails: Record<string, Alert>;
+  duration?: string;
+  generatedAt: string;
 }
 
 // Sensor reading types

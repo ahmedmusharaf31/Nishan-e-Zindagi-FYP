@@ -4,8 +4,8 @@ import json
 
 # ================= CONFIGURATION =================
 DEVICE_ID = "PicoB-001"
-HOME_LAT = 34.069254
-HOME_LON = 72.640308
+HOME_LAT = 34.070344
+HOME_LON = 72.643019
 DUMMY_BATT = 98
 
 # ================= INITIALIZATION =================
