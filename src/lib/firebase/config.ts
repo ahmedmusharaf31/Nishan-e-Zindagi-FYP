@@ -1,5 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,12 +14,18 @@ const firebaseConfig = {
 // Initialize Firebase
 let app: FirebaseApp;
 let auth: Auth;
+let firestore: Firestore;
+let googleProvider: GoogleAuthProvider;
+let githubProvider: GithubAuthProvider;
 
 if (typeof window !== 'undefined') {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
+  firestore = getFirestore(app);
+  googleProvider = new GoogleAuthProvider();
+  githubProvider = new GithubAuthProvider();
 }
 
-export { app, auth };
+export { app, auth, firestore, googleProvider, githubProvider };
 
 export const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';

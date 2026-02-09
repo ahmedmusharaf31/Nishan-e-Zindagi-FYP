@@ -7,7 +7,9 @@ import { DeviceGrid } from '@/components/devices';
 import { CreateCampaignDialog } from '@/components/campaigns';
 import { useUserStore, useDeviceStore, useAlertStore, useCampaignStore } from '@/store';
 import { Button } from '@/components/ui/button';
-import { Users, Radio, Bell, Megaphone, Plus } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { uploadDataToCloud } from '@/lib/firebase/cloud-sync';
+import { Users, Radio, Bell, Megaphone, Plus, UploadCloud, Loader2 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const { users } = useUserStore();
@@ -15,10 +17,30 @@ export default function AdminDashboardPage() {
   const { getActiveAlerts } = useAlertStore();
   const { getActiveCampaigns, fetchCampaigns } = useCampaignStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const activeAlerts = getActiveAlerts();
   const activeCampaigns = getActiveCampaigns();
   const onlineDevices = devices.filter(d => d.status === 'online');
+
+  const handleUploadCloud = async () => {
+    setIsUploading(true);
+    try {
+      const result = await uploadDataToCloud();
+      toast({
+        title: 'Data uploaded to cloud',
+        description: `Synced ${result.users} users, ${result.devices} devices, ${result.alerts} alerts, ${result.campaigns} campaigns, ${result.sensorReadings} sensor readings.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <RoleGuard allowedRoles={['admin']} fallbackUrl="/rescuer">
@@ -31,10 +53,25 @@ export default function AdminDashboardPage() {
               System overview and device monitoring
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Start Campaign
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleUploadCloud}
+              disabled={isUploading}
+              className="gap-2"
+            >
+              {isUploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <UploadCloud className="w-4 h-4" />
+              )}
+              {isUploading ? 'Uploading...' : 'Upload to Cloud'}
+            </Button>
+            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Start Campaign
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

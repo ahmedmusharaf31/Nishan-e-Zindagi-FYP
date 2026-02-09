@@ -8,14 +8,18 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   updateProfile,
+  signInWithPopup,
+  sendEmailVerification,
 } from 'firebase/auth';
-import { auth, isDemoMode } from '@/lib/firebase/config';
+import { auth, isDemoMode, googleProvider, githubProvider } from '@/lib/firebase/config';
 import { User, UserRole, AuthState } from '@/types';
 import { useUserStore } from '@/store/user-store';
 
 interface AuthContextType extends AuthState {
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<User | null>;
   signUp: (email: string, password: string, displayName: string, role: UserRole) => Promise<void>;
+  signInWithGoogle: (role?: UserRole) => Promise<User | null>;
+  signInWithGitHub: (role?: UserRole) => Promise<User | null>;
   signOut: () => Promise<void>;
   updateUserRole: (role: UserRole) => void;
 }
@@ -125,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [loadUserProfile]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<User | null> => {
     if (isDemoMode) {
       // Demo mode authentication
       const demoUser = DEMO_USERS[email.toLowerCase()];
@@ -137,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
           isAuthenticated: true,
         });
-        return;
+        return demoUser.user;
       }
 
       // Check store for custom users
@@ -150,13 +154,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
           isAuthenticated: true,
         });
-        return;
+        return storedUser;
       }
 
       throw new Error('Invalid email or password');
     }
 
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+    // Check if email is verified
+    if (!userCredential.user.emailVerified) {
+      await firebaseSignOut(auth);
+      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+    }
+
     const userProfile = await loadUserProfile(userCredential.user.email || '');
 
     setAuthState({
@@ -169,6 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading: false,
       isAuthenticated: true,
     });
+
+    return userProfile;
   };
 
   const signUp = async (email: string, password: string, displayName: string, role: UserRole) => {
@@ -200,6 +213,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Update Firebase profile
     await updateProfile(userCredential.user, { displayName });
 
+    // Send email verification
+    await sendEmailVerification(userCredential.user);
+
     // Create user profile in store
     const newUser: User = {
       id: userCredential.user.uid,
@@ -212,17 +228,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     await addUser(newUser);
 
+    // Sign out so user must verify email before accessing the app
+    await firebaseSignOut(auth);
+  };
+
+  const handleSocialSignIn = async (provider: 'google' | 'github', role?: UserRole): Promise<User | null> => {
+    if (isDemoMode) {
+      throw new Error('Social sign-in is not available in demo mode');
+    }
+
+    const authProvider = provider === 'google' ? googleProvider : githubProvider;
+    const result = await signInWithPopup(auth, authProvider);
+    const firebaseUser = result.user;
+
+    // Check if user profile exists in store
+    let userProfile = (await getUserByEmail(firebaseUser.email || '')) || null;
+
+    if (!userProfile && role) {
+      // First-time social login from register page — create profile with selected role
+      const newUser: User = {
+        id: firebaseUser.uid,
+        email: (firebaseUser.email || '').toLowerCase(),
+        displayName: firebaseUser.displayName || 'User',
+        role,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+      await addUser(newUser);
+      userProfile = newUser;
+    }
+
     setAuthState({
       user: {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
       },
-      userProfile: newUser,
+      userProfile,
       isLoading: false,
       isAuthenticated: true,
     });
+
+    return userProfile;
   };
+
+  const signInWithGoogle = async (role?: UserRole) => handleSocialSignIn('google', role);
+  const signInWithGitHub = async (role?: UserRole) => handleSocialSignIn('github', role);
 
   const signOut = async () => {
     if (isDemoMode) {
@@ -267,6 +318,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...authState,
         signIn,
         signUp,
+        signInWithGoogle,
+        signInWithGitHub,
         signOut,
         updateUserRole,
       }}

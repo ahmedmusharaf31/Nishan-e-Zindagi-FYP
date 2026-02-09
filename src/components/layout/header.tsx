@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
-import { useWebSocket } from '@/providers/websocket-provider';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -14,15 +13,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Bell, LogOut, Menu, User, Wifi, WifiOff } from 'lucide-react';
+import { Bell, LogOut, Menu, User, AlertTriangle, Info, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useAlertStore } from '@/store/alert-store';
 import { cn } from '@/lib/utils';
+import { Alert } from '@/types';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -31,10 +25,11 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
-  const { getActiveAlerts } = useAlertStore();
-  const { status: wsStatus, isConnected } = useWebSocket();
+  const { getActiveAlerts, alerts } = useAlertStore();
 
   const activeAlerts = getActiveAlerts();
+  // Show recent alerts (up to 10, newest first)
+  const recentAlerts = alerts.slice(0, 10);
 
   const handleSignOut = async () => {
     await signOut();
@@ -48,6 +43,29 @@ export function Header({ onMenuClick }: HeaderProps) {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const getSeverityIcon = (severity: Alert['severity']) => {
+    switch (severity) {
+      case 'critical':
+        return <ShieldAlert className="h-4 w-4 text-red-500 shrink-0" />;
+      case 'high':
+        return <AlertCircle className="h-4 w-4 text-orange-500 shrink-0" />;
+      case 'medium':
+        return <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />;
+      default:
+        return <Info className="h-4 w-4 text-blue-500 shrink-0" />;
+    }
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -81,51 +99,70 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         {/* Right Side Actions */}
         <div className="flex items-center gap-2">
-          {/* Connection Status */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className={cn(
-                    'flex items-center gap-1.5 px-2 py-1 rounded-full text-xs',
-                    isConnected
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : wsStatus === 'connecting'
-                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                      : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                  )}
-                >
-                  {isConnected ? (
-                    <Wifi className="h-3 w-3" />
-                  ) : (
-                    <WifiOff className="h-3 w-3" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {isConnected ? 'Live' : wsStatus === 'connecting' ? 'Connecting' : 'Offline'}
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>
-                  {isConnected
-                    ? 'Receiving live updates'
-                    : wsStatus === 'connecting'
-                    ? 'Connecting to server...'
-                    : 'Not connected to live updates'}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            {activeAlerts.length > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                {activeAlerts.length > 9 ? '9+' : activeAlerts.length}
-              </span>
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                {activeAlerts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                    {activeAlerts.length > 9 ? '9+' : activeAlerts.length}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Notifications</span>
+                {activeAlerts.length > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {activeAlerts.length} active
+                  </Badge>
+                )}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {recentAlerts.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  No notifications
+                </div>
+              ) : (
+                recentAlerts.map((alert) => (
+                  <DropdownMenuItem
+                    key={alert.id}
+                    className="flex items-start gap-3 py-3 cursor-pointer"
+                    onClick={() => router.push('/dashboard/alerts')}
+                  >
+                    {getSeverityIcon(alert.severity)}
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        "text-sm truncate",
+                        alert.status === 'active' ? 'font-medium' : 'text-muted-foreground'
+                      )}>
+                        {alert.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatTimeAgo(alert.triggeredAt)}
+                      </p>
+                    </div>
+                    {alert.status === 'active' && (
+                      <span className="h-2 w-2 rounded-full bg-destructive shrink-0 mt-1.5" />
+                    )}
+                  </DropdownMenuItem>
+                ))
+              )}
+              {alerts.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-center justify-center text-sm text-primary cursor-pointer"
+                    onClick={() => router.push('/dashboard/alerts')}
+                  >
+                    View all alerts
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* User Menu */}
           <DropdownMenu>

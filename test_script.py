@@ -116,7 +116,7 @@ def on_receive(packet, interface):
             payload = payload.decode("utf-8", errors="ignore")
 
         print(f"Message from {name}: {payload}")
-
+        
         # Try to parse as JSON sensor data
         try:
             parsed = json.loads(payload)
