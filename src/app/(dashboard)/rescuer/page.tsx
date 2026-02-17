@@ -339,6 +339,7 @@ export default function RescuerDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
         {/* Create Campaign Dialog */}
         {isAdmin && (
           <CreateCampaignDialog

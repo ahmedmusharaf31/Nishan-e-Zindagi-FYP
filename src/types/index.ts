@@ -31,7 +31,7 @@ export interface Device {
 }
 
 // Alert types
-export type AlertType = 'sensor_threshold' | 'sos' | 'battery_low';
+export type AlertType = 'sensor_threshold' | 'sos' | 'battery_low' | 'manual_report';
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
 
@@ -43,6 +43,9 @@ export interface Alert {
   status: AlertStatus;
   title: string;
   description?: string;
+  location?: DeviceLocation;
+  reportedBy?: string;
+  survivorsFound?: number;
   triggeredAt: string;
   acknowledgedAt?: string;
   acknowledgedBy?: string;

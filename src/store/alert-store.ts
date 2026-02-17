@@ -12,7 +12,7 @@ interface AlertState {
   addAlert: (alert: Alert) => Promise<void>;
   updateAlert: (id: string, updates: Partial<Alert>) => Promise<void>;
   acknowledgeAlert: (id: string, acknowledgedBy: string) => Promise<void>;
-  resolveAlert: (id: string) => Promise<void>;
+  resolveAlert: (id: string, survivorsFound?: number) => Promise<void>;
   deleteAlert: (id: string) => Promise<void>;
   getAlertById: (id: string) => Alert | undefined;
   getAlertsByStatus: (status: AlertStatus) => Alert[];
@@ -69,10 +69,11 @@ export const useAlertStore = create<AlertState>((set, get) => ({
     });
   },
 
-  resolveAlert: async (id: string) => {
+  resolveAlert: async (id: string, survivorsFound?: number) => {
     await get().updateAlert(id, {
       status: 'resolved',
       resolvedAt: new Date().toISOString(),
+      ...(survivorsFound !== undefined ? { survivorsFound } : {}),
     });
   },
 

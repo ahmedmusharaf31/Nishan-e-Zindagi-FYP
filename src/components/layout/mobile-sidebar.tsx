@@ -13,6 +13,7 @@ import {
   BarChart3,
   Shield,
   X,
+  HeartPulse,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -47,6 +48,12 @@ const navItems: NavItem[] = [
     title: 'Campaigns',
     href: '/rescuer/campaigns',
     icon: Megaphone,
+    roles: ['rescuer', 'admin'],
+  },
+  {
+    title: 'Mark Survivor Location',
+    href: '/rescuer/mark-location',
+    icon: HeartPulse,
     roles: ['rescuer', 'admin'],
   },
   {

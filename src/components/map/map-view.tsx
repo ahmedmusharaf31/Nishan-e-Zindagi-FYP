@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ReactNode } from 'react';
 
@@ -13,6 +13,16 @@ interface MapViewProps {
   zoom?: number;
   children?: ReactNode;
   className?: string;
+  onMapClick?: (lat: number, lng: number) => void;
+}
+
+function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (e) => {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
 }
 
 export function MapView({
@@ -20,6 +30,7 @@ export function MapView({
   zoom = DEFAULT_ZOOM,
   children,
   className = 'h-[500px] w-full',
+  onMapClick,
 }: MapViewProps) {
   return (
     <div className={className}>
@@ -35,6 +46,7 @@ export function MapView({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ZoomControl position="bottomright" />
+        {onMapClick && <ClickHandler onMapClick={onMapClick} />}
         {children}
       </MapContainer>
     </div>

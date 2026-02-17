@@ -38,6 +38,22 @@ export class NishanEZindagiDB extends Dexie {
         }
       });
     });
+
+    this.version(3).stores({
+      users: 'id, email, role, isActive, createdAt',
+      devices: 'id, name, status, lastSeenAt',
+      alerts: 'id, deviceId, type, severity, status, triggeredAt',
+      campaigns: 'id, status, createdAt, *alertIds, *assignedRescuerIds',
+    }).upgrade(tx => {
+      // Remove pre-resolved status from seeded demo alerts so the resolved
+      // count on /dashboard/alerts only reflects alerts the user actually resolved.
+      return tx.table('alerts').where('id').anyOf(['alert-4', 'alert-7']).modify(alert => {
+        if (alert.status === 'resolved') {
+          alert.status = 'active';
+          delete alert.resolvedAt;
+        }
+      });
+    });
   }
 }
 
@@ -160,11 +176,10 @@ export async function seedDemoData() {
       deviceId: 'device-1',
       type: 'sensor_threshold',
       severity: 'low',
-      status: 'resolved',
+      status: 'active',
       title: 'Sensor Calibration Needed',
       description: 'Routine sensor check detected minor drift. Calibration recommended.',
       triggeredAt: new Date(Date.now() - 24 * 3600000).toISOString(),
-      resolvedAt: new Date(Date.now() - 20 * 3600000).toISOString(),
     },
     {
       id: 'alert-5',
@@ -191,11 +206,10 @@ export async function seedDemoData() {
       deviceId: 'device-3',
       type: 'sensor_threshold',
       severity: 'medium',
-      status: 'resolved',
+      status: 'active',
       title: 'CO2 Spike Detected',
       description: 'CO2 spike detected and resolved at Islamabad Station Gamma.',
       triggeredAt: new Date(Date.now() - 72 * 3600000).toISOString(),
-      resolvedAt: new Date(Date.now() - 68 * 3600000).toISOString(),
     },
   ];
 

@@ -1,1 +1,1 @@
-export { DynamicMapView, DeviceMarker, DeviceMarkers } from './dynamic-map';
+export { DynamicMapView, DeviceMarker, DeviceMarkers, DynamicManualReportMarker } from './dynamic-map';

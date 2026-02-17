@@ -14,6 +14,8 @@ import {
   Clock,
   MapPin,
   Smartphone,
+  UserCheck,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -135,12 +137,35 @@ export function AlertCard({
             )}
 
             {/* Meta info */}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              {deviceName && (
-                <span className="flex items-center gap-1">
-                  <Smartphone className="w-3 h-3" />
-                  {deviceName}
-                </span>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+              {alert.type === 'manual_report' ? (
+                <>
+                  {alert.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {alert.location.latitude.toFixed(4)}, {alert.location.longitude.toFixed(4)}
+                    </span>
+                  )}
+                  {alert.reportedBy && (
+                    <span className="flex items-center gap-1">
+                      <UserCheck className="w-3 h-3" />
+                      {alert.reportedBy}
+                    </span>
+                  )}
+                  {alert.status === 'resolved' && alert.survivorsFound !== undefined && (
+                    <span className="flex items-center gap-1 text-green-600 font-medium">
+                      <Users className="w-3 h-3" />
+                      {alert.survivorsFound} rescued
+                    </span>
+                  )}
+                </>
+              ) : (
+                deviceName && (
+                  <span className="flex items-center gap-1">
+                    <Smartphone className="w-3 h-3" />
+                    {deviceName}
+                  </span>
+                )
               )}
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />

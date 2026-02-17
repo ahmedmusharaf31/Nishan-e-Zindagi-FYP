@@ -2,7 +2,7 @@
 
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { Device, DeviceStatus, SurvivorProbability } from '@/types';
+import { AlertSeverity, Device, DeviceStatus, SurvivorProbability } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Battery, Wifi, WifiOff, AlertTriangle, Wind, Thermometer, Droplets } from 'lucide-react';
@@ -201,5 +201,68 @@ export function DeviceMarkers({ devices, onDeviceClick }: DeviceMarkersProps) {
         />
       ))}
     </>
+  );
+}
+
+function createManualReportIcon(): L.DivIcon {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `
+      <div style="
+        background-color: #7c3aed;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: manualPulse 1.5s ease-in-out infinite;
+      ">
+        <div style="
+          width: 10px;
+          height: 10px;
+          background-color: white;
+          border-radius: 50%;
+        "></div>
+      </div>
+      <style>
+        @keyframes manualPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.3); opacity: 0.8; }
+        }
+      </style>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
+  });
+}
+
+interface ManualReportMarkerProps {
+  position: [number, number];
+  reportedBy: string;
+  severity: AlertSeverity;
+}
+
+export function ManualReportMarker({ position, reportedBy, severity }: ManualReportMarkerProps) {
+  const icon = createManualReportIcon();
+
+  return (
+    <Marker position={position} icon={icon}>
+      <Popup>
+        <div className="min-w-[200px] p-1">
+          <h3 className="font-semibold text-sm mb-2" style={{ color: '#7c3aed' }}>
+            Potential Survivor Location
+          </h3>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <div><span className="font-medium">Reported by:</span> {reportedBy}</div>
+            <div><span className="font-medium">Severity:</span> {severity}</div>
+            <div><span className="font-medium">Coordinates:</span> {position[0].toFixed(5)}, {position[1].toFixed(5)}</div>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
   );
 }

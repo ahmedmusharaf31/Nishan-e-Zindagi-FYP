@@ -26,3 +26,8 @@ export const DeviceMarker = dynamic(
   () => import('./device-marker').then((mod) => mod.DeviceMarker),
   { ssr: false }
 );
+
+export const DynamicManualReportMarker = dynamic(
+  () => import('./device-marker').then((mod) => mod.ManualReportMarker),
+  { ssr: false }
+);

@@ -128,7 +128,11 @@ export default function PublicAlertsPage() {
 
   // Campaign/rescue stats
   const rescueStats = useMemo(() => {
-    const totalSurvivors = campaigns.reduce((sum, c) => sum + (c.totalSurvivorsFound || 0), 0);
+    const campaignSurvivors = campaigns.reduce((sum, c) => sum + (c.totalSurvivorsFound || 0), 0);
+    const manualSurvivors = alerts
+      .filter(a => a.type === 'manual_report' && a.status === 'resolved' && a.survivorsFound)
+      .reduce((sum, a) => sum + (a.survivorsFound || 0), 0);
+    const totalSurvivors = campaignSurvivors + manualSurvivors;
     const activeCampaigns = campaigns.filter(c => !['resolved', 'cancelled'].includes(c.status)).length;
     const resolvedCampaigns = campaigns.filter(c => c.status === 'resolved');
     const criticalAlerts = alerts.filter(a => a.severity === 'critical' && a.status === 'active').length;

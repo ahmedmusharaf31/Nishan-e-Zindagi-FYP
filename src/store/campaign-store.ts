@@ -403,10 +403,18 @@ export const useStore = create<CampaignState>((set, get) => ({
       (c.assignedRescuerIds || []).forEach(id => deployedRescuerSet.add(id));
     });
 
-    const totalSurvivorsFound = campaigns.reduce(
+    const campaignSurvivors = campaigns.reduce(
       (sum, c) => sum + (c.totalSurvivorsFound || 0),
       0
     );
+
+    // Also count survivors rescued from manual_report alerts (not linked to campaigns)
+    const alertStore = useAlertStore.getState();
+    const manualSurvivors = alertStore.alerts
+      .filter(a => a.type === 'manual_report' && a.status === 'resolved' && a.survivorsFound)
+      .reduce((sum, a) => sum + (a.survivorsFound || 0), 0);
+
+    const totalSurvivorsFound = campaignSurvivors + manualSurvivors;
 
     return {
       deployedNodes,
