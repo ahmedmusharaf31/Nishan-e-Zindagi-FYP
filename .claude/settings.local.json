@@ -36,7 +36,11 @@
       "Bash(git stash:*)",
       "Bash(npx next lint)",
       "Bash(xargs:*)",
-      "Bash(set NODE_OPTIONS=--max-old-space-size=4096)"
+      "Bash(set NODE_OPTIONS=--max-old-space-size=4096)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx next build:*)",
+      "Bash(npx eslint:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx next lint:*)"
     ]
   }
 }
