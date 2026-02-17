@@ -23,6 +23,7 @@ interface CampaignState {
 
   // New multi-node/multi-rescuer methods
   createCampaignFromAlerts: (name: string, alertIds: string[], rescuerIds?: string[], alertDeviceMap?: Record<string, { deviceId: string; location: { latitude: number; longitude: number } }>) => Promise<Campaign>;
+  createCampaignFromDevices: (name: string, deviceIds: string[], rescuerIds?: string[], deviceMap?: Record<string, { location: { latitude: number; longitude: number } }>) => Promise<Campaign>;
   assignNodeToRescuers: (campaignId: string, nodeId: string, rescuerIds: string[]) => Promise<void>;
   markNodeRescued: (campaignId: string, nodeId: string, rescuedBy: string, survivorsFound?: number) => Promise<void>;
   resolveCampaign: (campaignId: string, resolvedBy: string, note?: string) => Promise<void>;
@@ -217,6 +218,55 @@ export const useStore = create<CampaignState>((set, get) => ({
           status: 'initiated',
           timestamp: new Date().toISOString(),
           note: `Campaign created with ${alertIds.length} node(s)`,
+        },
+        ...(rescuerIds.length > 0
+          ? [
+              {
+                status: 'assigned' as CampaignStatus,
+                timestamp: new Date().toISOString(),
+                note: `Assigned to ${rescuerIds.length} rescuer(s)`,
+              },
+            ]
+          : []),
+      ],
+      notes: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await get().addCampaign(campaign);
+    return campaign;
+  },
+
+  createCampaignFromDevices: async (name, deviceIds, rescuerIds = [], deviceMap = {}) => {
+    const nodeAssignments: NodeAssignment[] = deviceIds.map((deviceId, index) => {
+      const info = deviceMap[deviceId];
+      return {
+        nodeId: `node-${generateId()}-${index}`,
+        deviceId,
+        alertId: '',
+        assignedRescuerIds: [],
+        location: info?.location || { latitude: 0, longitude: 0 },
+        status: 'pending' as const,
+      };
+    });
+
+    const firstLocation = nodeAssignments[0]?.location || { latitude: 0, longitude: 0 };
+
+    const campaign: Campaign = {
+      id: `campaign-${generateId()}`,
+      name,
+      alertIds: [],
+      assignedRescuerId: rescuerIds[0],
+      assignedRescuerIds: rescuerIds,
+      nodeAssignments,
+      status: rescuerIds.length > 0 ? 'assigned' : 'initiated',
+      location: firstLocation,
+      statusHistory: [
+        {
+          status: 'initiated',
+          timestamp: new Date().toISOString(),
+          note: `Campaign created with ${deviceIds.length} device(s)`,
         },
         ...(rescuerIds.length > 0
           ? [

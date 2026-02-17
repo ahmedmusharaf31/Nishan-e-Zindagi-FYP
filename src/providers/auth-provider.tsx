@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -10,6 +10,7 @@ import {
   updateProfile,
   signInWithPopup,
   sendEmailVerification,
+  getAdditionalUserInfo,
 } from 'firebase/auth';
 import { auth, isDemoMode, googleProvider, githubProvider } from '@/lib/firebase/config';
 import { User, UserRole, AuthState } from '@/types';
@@ -73,6 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const { getUserByEmail, addUser, updateUser } = useUserStore();
 
+  // Prevents onAuthStateChanged from overwriting state during explicit auth calls
+  const isHandlingAuthRef = useRef(false);
+
   // Load user profile from store
   const loadUserProfile = useCallback(async (email: string): Promise<User | null> => {
     // First check demo users
@@ -104,7 +108,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      // Skip if an explicit auth call (signIn/signUp/socialSignIn) is in progress
+      if (isHandlingAuthRef.current) return;
+
       if (firebaseUser) {
+        // Block unverified email users from auto-signing in
+        if (!firebaseUser.emailVerified) {
+          await firebaseSignOut(auth);
+          setAuthState({
+            user: null,
+            userProfile: null,
+            isLoading: false,
+            isAuthenticated: false,
+          });
+          return;
+        }
+
         const userProfile = await loadUserProfile(firebaseUser.email || '');
         setAuthState({
           user: {
@@ -160,28 +179,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Invalid email or password');
     }
 
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    isHandlingAuthRef.current = true;
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
-    // Check if email is verified
-    if (!userCredential.user.emailVerified) {
-      await firebaseSignOut(auth);
-      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+      // Check if email is verified
+      if (!userCredential.user.emailVerified) {
+        await firebaseSignOut(auth);
+        throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+      }
+
+      const userProfile = await loadUserProfile(userCredential.user.email || '');
+
+      // No profile found — user must register first
+      if (!userProfile) {
+        await firebaseSignOut(auth);
+        throw new Error('No account found. Please create an account first.');
+      }
+
+      setAuthState({
+        user: {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: userCredential.user.displayName,
+        },
+        userProfile,
+        isLoading: false,
+        isAuthenticated: true,
+      });
+
+      return userProfile;
+    } finally {
+      isHandlingAuthRef.current = false;
     }
-
-    const userProfile = await loadUserProfile(userCredential.user.email || '');
-
-    setAuthState({
-      user: {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-      },
-      userProfile,
-      isLoading: false,
-      isAuthenticated: true,
-    });
-
-    return userProfile;
   };
 
   const signUp = async (email: string, password: string, displayName: string, role: UserRole) => {
@@ -208,28 +238,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    isHandlingAuthRef.current = true;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Update Firebase profile
-    await updateProfile(userCredential.user, { displayName });
+      // Update Firebase profile
+      await updateProfile(userCredential.user, { displayName });
 
-    // Send email verification
-    await sendEmailVerification(userCredential.user);
+      // Send email verification
+      await sendEmailVerification(userCredential.user);
 
-    // Create user profile in store
-    const newUser: User = {
-      id: userCredential.user.uid,
-      email: email.toLowerCase(),
-      displayName,
-      role,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
+      // Create user profile in store
+      const newUser: User = {
+        id: userCredential.user.uid,
+        email: email.toLowerCase(),
+        displayName,
+        role,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
 
-    await addUser(newUser);
+      await addUser(newUser);
 
-    // Sign out so user must verify email before accessing the app
-    await firebaseSignOut(auth);
+      // Sign out so user must verify email before accessing the app
+      await firebaseSignOut(auth);
+    } finally {
+      isHandlingAuthRef.current = false;
+    }
   };
 
   const handleSocialSignIn = async (provider: 'google' | 'github', role?: UserRole): Promise<User | null> => {
@@ -237,39 +272,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Social sign-in is not available in demo mode');
     }
 
-    const authProvider = provider === 'google' ? googleProvider : githubProvider;
-    const result = await signInWithPopup(auth, authProvider);
-    const firebaseUser = result.user;
+    isHandlingAuthRef.current = true;
+    try {
+      const authProvider = provider === 'google' ? googleProvider : githubProvider;
+      const result = await signInWithPopup(auth, authProvider);
+      const firebaseUser = result.user;
+      const isNewFirebaseUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
 
-    // Check if user profile exists in store
-    let userProfile = (await getUserByEmail(firebaseUser.email || '')) || null;
+      // Check if user profile exists in store
+      let userProfile = (await getUserByEmail(firebaseUser.email || '')) || null;
 
-    if (!userProfile && role) {
-      // First-time social login from register page — create profile with selected role
-      const newUser: User = {
-        id: firebaseUser.uid,
-        email: (firebaseUser.email || '').toLowerCase(),
-        displayName: firebaseUser.displayName || 'User',
-        role,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-      await addUser(newUser);
-      userProfile = newUser;
+      // Determine the role to assign
+      const assignedRole = role || 'public';
+
+      if (!userProfile) {
+        // No local profile — create one
+        const newUser: User = {
+          id: firebaseUser.uid,
+          email: (firebaseUser.email || '').toLowerCase(),
+          displayName: firebaseUser.displayName || 'User',
+          role: assignedRole,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        await addUser(newUser);
+        userProfile = newUser;
+      } else if (isNewFirebaseUser && !role) {
+        // New Firebase account but stale local profile — reset to 'public'
+        await updateUser(userProfile.id, { role: 'public' });
+        userProfile = { ...userProfile, role: 'public' };
+      } else if (role && userProfile.role !== role) {
+        // Re-registration from register page with a different role — update it
+        await updateUser(userProfile.id, { role });
+        userProfile = { ...userProfile, role };
+      }
+
+      setAuthState({
+        user: {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+        },
+        userProfile,
+        isLoading: false,
+        isAuthenticated: true,
+      });
+
+      return userProfile;
+    } finally {
+      isHandlingAuthRef.current = false;
     }
-
-    setAuthState({
-      user: {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-      },
-      userProfile,
-      isLoading: false,
-      isAuthenticated: true,
-    });
-
-    return userProfile;
   };
 
   const signInWithGoogle = async (role?: UserRole) => handleSocialSignIn('google', role);

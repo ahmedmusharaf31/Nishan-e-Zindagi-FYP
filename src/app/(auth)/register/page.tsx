@@ -23,6 +23,7 @@ import { UserRole } from '@/types';
 import { isDemoMode } from '@/lib/firebase/config';
 
 const VALID_EMAIL_DOMAINS = [
+  'giki.edu.pk',
   'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com',
   'live.com', 'icloud.com', 'protonmail.com', 'mail.com',
   'zoho.com', 'aol.com', 'yandex.com', 'gmx.com',
@@ -39,7 +40,7 @@ const registerSchema = z.object({
         return VALID_EMAIL_DOMAINS.includes(domain);
       },
       {
-        message: `Email must be from a valid provider (${['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].join(', ')}, etc.)`,
+        message: `Email must be from a valid provider (giki.edu.pk, gmail.com, yahoo.com, outlook.com, etc.)`,
       }
     ),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -267,7 +268,7 @@ export default function RegisterPage() {
                   <Input
                     id="displayName"
                     type="text"
-                    placeholder="Ahmed Khan"
+                    placeholder="Ahmed Musharaf"
                     className="pl-9 h-11"
                     {...register('displayName')}
                     disabled={anyLoading}
@@ -285,7 +286,7 @@ export default function RegisterPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="you@gmail.com"
+                    placeholder="you@example.com"
                     className="pl-9 h-11"
                     {...register('email')}
                     disabled={anyLoading}

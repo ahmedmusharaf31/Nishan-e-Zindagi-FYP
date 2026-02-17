@@ -33,7 +33,10 @@
       "Bash(npm ls:*)",
       "Bash(npx tsc:*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(npx next lint)",
+      "Bash(xargs:*)",
+      "Bash(set NODE_OPTIONS=--max-old-space-size=4096)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { RoleGuard } from '@/components/auth';
 import { UserTable, UserDialog } from '@/components/dashboard';
 import { useUserStore } from '@/store/user-store';
@@ -23,7 +23,21 @@ export default function UserManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
 
-  const filteredUsers = users.filter((user) => {
+  // Deduplicate users by email, keeping the latest by createdAt
+  const distinctUsers = useMemo(() => {
+    const emailMap = new Map<string, typeof users[0]>();
+    for (const user of users) {
+      const existing = emailMap.get(user.email);
+      if (!existing || new Date(user.createdAt) > new Date(existing.createdAt)) {
+        emailMap.set(user.email, user);
+      }
+    }
+    return Array.from(emailMap.values());
+  }, [users]);
+
+  const hasDuplicates = distinctUsers.length < users.length;
+
+  const filteredUsers = distinctUsers.filter((user) => {
     const matchesSearch =
       user.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -56,7 +70,10 @@ export default function UserManagementPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
+              <div className="text-2xl font-bold">{distinctUsers.length}</div>
+              {hasDuplicates && (
+                <p className="text-xs text-muted-foreground">({distinctUsers.length} distinct)</p>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -65,7 +82,7 @@ export default function UserManagementPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.role === 'admin').length}
+                {distinctUsers.filter(u => u.role === 'admin').length}
               </div>
             </CardContent>
           </Card>
@@ -75,7 +92,7 @@ export default function UserManagementPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.role === 'rescuer').length}
+                {distinctUsers.filter(u => u.role === 'rescuer').length}
               </div>
             </CardContent>
           </Card>
@@ -85,7 +102,7 @@ export default function UserManagementPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.role === 'public').length}
+                {distinctUsers.filter(u => u.role === 'public').length}
               </div>
             </CardContent>
           </Card>

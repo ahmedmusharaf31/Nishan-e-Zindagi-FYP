@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAlertStore, useDeviceStore, useUserStore, useCampaignStore } from '@/store';
+import { useDeviceStore, useUserStore, useCampaignStore } from '@/store';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   User as UserIcon,
   Radio,
   CheckCircle,
+  Battery,
 } from 'lucide-react';
 
 interface CreateCampaignDialogProps {
@@ -42,40 +43,34 @@ export function CreateCampaignDialog({
   onCreated,
   preselectedAlertIds = EMPTY_ARRAY,
 }: CreateCampaignDialogProps) {
-  const { alerts, fetchAlerts } = useAlertStore();
   const { devices, fetchDevices } = useDeviceStore();
   const { fetchUsers, getUsersByRole } = useUserStore();
-  const { createCampaignFromAlerts } = useCampaignStore();
+  const { createCampaignFromDevices } = useCampaignStore();
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
-  const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>(preselectedAlertIds);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>(preselectedAlertIds);
   const [selectedRescuerIds, setSelectedRescuerIds] = useState<string[]>([]);
   const [campaignName, setCampaignName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
-      fetchAlerts();
       fetchDevices();
       fetchUsers();
       setStep(1);
-      setSelectedAlertIds(preselectedAlertIds);
+      setSelectedDeviceIds(preselectedAlertIds);
       setSelectedRescuerIds([]);
       setCampaignName('');
     }
-  }, [open, fetchAlerts, fetchDevices, fetchUsers, preselectedAlertIds]);
+  }, [open, fetchDevices, fetchUsers, preselectedAlertIds]);
 
-  const activeAlerts = alerts.filter(a => a.status === 'active' || a.status === 'acknowledged');
+  const onlineDevices = devices.filter(d => d.status === 'online' || d.status === 'warning');
   const rescuers = getUsersByRole('rescuer').filter(u => u.isActive);
 
-  const getDeviceForAlert = (alertDeviceId: string) => {
-    return devices.find(d => d.id === alertDeviceId);
-  };
-
-  const toggleAlert = (alertId: string) => {
-    setSelectedAlertIds(prev =>
-      prev.includes(alertId) ? prev.filter(id => id !== alertId) : [...prev, alertId]
+  const toggleDevice = (deviceId: string) => {
+    setSelectedDeviceIds(prev =>
+      prev.includes(deviceId) ? prev.filter(id => id !== deviceId) : [...prev, deviceId]
     );
   };
 
@@ -86,30 +81,23 @@ export function CreateCampaignDialog({
   };
 
   const handleCreate = async () => {
-    if (!campaignName.trim() || selectedAlertIds.length === 0) return;
+    if (!campaignName.trim() || selectedDeviceIds.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      // Build alert-device map
-      const alertDeviceMap: Record<string, { deviceId: string; location: { latitude: number; longitude: number } }> = {};
-      selectedAlertIds.forEach(alertId => {
-        const alert = alerts.find(a => a.id === alertId);
-        if (alert) {
-          const device = getDeviceForAlert(alert.deviceId);
-          if (device) {
-            alertDeviceMap[alertId] = {
-              deviceId: device.id,
-              location: device.location,
-            };
-          }
+      const deviceMap: Record<string, { location: { latitude: number; longitude: number } }> = {};
+      selectedDeviceIds.forEach(deviceId => {
+        const device = devices.find(d => d.id === deviceId);
+        if (device) {
+          deviceMap[deviceId] = { location: device.location };
         }
       });
 
-      await createCampaignFromAlerts(campaignName, selectedAlertIds, selectedRescuerIds, alertDeviceMap);
+      await createCampaignFromDevices(campaignName, selectedDeviceIds, selectedRescuerIds, deviceMap);
 
       toast({
         title: 'Campaign Created',
-        description: `Campaign "${campaignName}" created with ${selectedAlertIds.length} node(s) and ${selectedRescuerIds.length} rescuer(s).`,
+        description: `Campaign "${campaignName}" created with ${selectedDeviceIds.length} device(s) and ${selectedRescuerIds.length} rescuer(s).`,
       });
       onOpenChange(false);
       onCreated?.();
@@ -130,7 +118,7 @@ export function CreateCampaignDialog({
         <DialogHeader>
           <DialogTitle>Create Rescue Campaign</DialogTitle>
           <DialogDescription>
-            {step === 1 && 'Step 1: Select nodes/alerts to include in this campaign'}
+            {step === 1 && 'Step 1: Select deployed devices to include in this campaign'}
             {step === 2 && 'Step 2: Assign rescuers to the campaign'}
             {step === 3 && 'Step 3: Review and confirm campaign details'}
           </DialogDescription>
@@ -154,50 +142,50 @@ export function CreateCampaignDialog({
           ))}
         </div>
 
-        {/* Step 1: Select Nodes/Alerts */}
+        {/* Step 1: Select Devices */}
         {step === 1 && (
           <ScrollArea className="h-[300px]">
             <div className="space-y-2 pr-4">
-              {activeAlerts.length === 0 ? (
+              {onlineDevices.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Radio className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No active alerts available</p>
+                  <p className="text-sm">No online devices available</p>
                 </div>
               ) : (
-                activeAlerts.map(alert => {
-                  const device = getDeviceForAlert(alert.deviceId);
-                  const isSelected = selectedAlertIds.includes(alert.id);
+                onlineDevices.map(device => {
+                  const isSelected = selectedDeviceIds.includes(device.id);
                   return (
                     <div
-                      key={alert.id}
+                      key={device.id}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                         isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
                       }`}
-                      onClick={() => toggleAlert(alert.id)}
+                      onClick={() => toggleDevice(device.id)}
                     >
                       <div className="flex items-start gap-3">
                         <Checkbox checked={isSelected} className="mt-1" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium text-sm truncate">
-                              {device?.name || alert.deviceId}
+                              {device.name}
                             </span>
                             <Badge
-                              variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}
+                              variant={device.status === 'online' ? 'default' : 'secondary'}
                               className="text-xs flex-shrink-0"
                             >
-                              {alert.severity}
+                              {device.status}
                             </Badge>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">
-                            {alert.title}
-                          </p>
-                          {device && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
                               {device.location.latitude.toFixed(4)}, {device.location.longitude.toFixed(4)}
-                            </p>
-                          )}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Battery className="w-3 h-3" />
+                              {device.batteryLevel}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -264,17 +252,16 @@ export function CreateCampaignDialog({
 
             <div className="p-3 bg-muted rounded-lg space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Selected Nodes</span>
-                <Badge variant="secondary">{selectedAlertIds.length}</Badge>
+                <span className="text-sm font-medium">Selected Devices</span>
+                <Badge variant="secondary">{selectedDeviceIds.length}</Badge>
               </div>
               <div className="space-y-1">
-                {selectedAlertIds.map(alertId => {
-                  const alert = alerts.find(a => a.id === alertId);
-                  const device = alert ? getDeviceForAlert(alert.deviceId) : null;
+                {selectedDeviceIds.map(deviceId => {
+                  const device = devices.find(d => d.id === deviceId);
                   return (
-                    <p key={alertId} className="text-xs text-muted-foreground flex items-center gap-1">
+                    <p key={deviceId} className="text-xs text-muted-foreground flex items-center gap-1">
                       <Radio className="w-3 h-3" />
-                      {device?.name || alertId} - {alert?.title}
+                      {device?.name || deviceId} - {device?.location.latitude.toFixed(4)}, {device?.location.longitude.toFixed(4)}
                     </p>
                   );
                 })}
@@ -321,7 +308,7 @@ export function CreateCampaignDialog({
             {step < 3 ? (
               <Button
                 onClick={() => setStep(step + 1)}
-                disabled={step === 1 && selectedAlertIds.length === 0}
+                disabled={step === 1 && selectedDeviceIds.length === 0}
               >
                 Next
                 <ChevronRight className="w-4 h-4 ml-1" />

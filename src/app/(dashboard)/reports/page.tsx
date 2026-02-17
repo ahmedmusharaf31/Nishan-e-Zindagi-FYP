@@ -352,8 +352,8 @@ export default function ReportsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                      <Megaphone className="w-5 h-5 text-blue-600" />
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                      <Megaphone className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Active Operations</p>
@@ -378,8 +378,8 @@ export default function ReportsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                      <CheckCircle className="w-5 h-5 text-purple-600" />
+                    <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30">
+                      <CheckCircle className="w-5 h-5 text-teal-600" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Resolved Campaigns</p>
@@ -394,8 +394,8 @@ export default function ReportsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                      <Radio className="w-5 h-5 text-blue-600" />
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                      <Radio className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Devices</p>
@@ -436,8 +436,8 @@ export default function ReportsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                      <TrendingUp className="w-5 h-5 text-purple-600" />
+                    <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30">
+                      <TrendingUp className="w-5 h-5 text-teal-600" />
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Avg Battery</p>

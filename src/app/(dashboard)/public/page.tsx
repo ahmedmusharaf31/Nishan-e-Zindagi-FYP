@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { RoleGuard } from '@/components/auth';
 import { AlertCard } from '@/components/alerts';
-import { useAlertStore, useDeviceStore, useCampaignStore } from '@/store';
+import { useAlertStore, useDeviceStore, useCampaignStore, useSensorStore } from '@/store';
 import { useWebSocket } from '@/providers/websocket-provider';
 import { AlertSeverity, AlertStatus } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,12 +28,17 @@ import {
   Megaphone,
   ShieldAlert,
   CheckCircle,
+  Newspaper,
+  ShieldCheck,
+  AlertOctagon,
+  Siren,
 } from 'lucide-react';
 
 export default function PublicAlertsPage() {
   const { alerts, fetchAlerts } = useAlertStore();
   const { devices, fetchDevices } = useDeviceStore();
   const { campaigns, fetchCampaigns } = useCampaignStore();
+  const { getAllLatestReadings, thresholds } = useSensorStore();
   const { isConnected } = useWebSocket();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -106,6 +111,54 @@ export default function PublicAlertsPage() {
     return { totalSurvivors, activeCampaigns, resolvedCampaigns, dangerLevel };
   }, [campaigns, alerts]);
 
+  // Generate news items
+  const newsItems = useMemo(() => {
+    const items: { id: string; type: 'success' | 'safe' | 'danger' | 'active'; text: string }[] = [];
+
+    // Resolved campaigns with survivors
+    rescueStats.resolvedCampaigns.forEach(campaign => {
+      if ((campaign.totalSurvivorsFound || 0) > 0) {
+        items.push({
+          id: `rescued-${campaign.id}`,
+          type: 'success',
+          text: `${campaign.totalSurvivorsFound} person(s) rescued in ${campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`}`,
+        });
+      }
+    });
+
+    // Active campaigns
+    const activeCampaignList = campaigns.filter(c => !['resolved', 'cancelled'].includes(c.status));
+    activeCampaignList.forEach(campaign => {
+      items.push({
+        id: `active-${campaign.id}`,
+        type: 'active',
+        text: `Rescue operation in progress at ${campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`}`,
+      });
+    });
+
+    // Safe / unsafe areas from sensor readings
+    const latestReadings = getAllLatestReadings();
+    latestReadings.forEach(reading => {
+      const device = devices.find(d => d.id === reading.deviceId);
+      const name = device?.name || reading.deviceId;
+      if (reading.co2 > thresholds.co2Threshold) {
+        items.push({
+          id: `danger-${reading.deviceId}`,
+          type: 'danger',
+          text: `Danger: Area near ${name} is unsafe (CO2: ${reading.co2} ppm)`,
+        });
+      } else {
+        items.push({
+          id: `safe-${reading.deviceId}`,
+          type: 'safe',
+          text: `Area near ${name} is safe`,
+        });
+      }
+    });
+
+    return items;
+  }, [rescueStats.resolvedCampaigns, campaigns, getAllLatestReadings, devices, thresholds.co2Threshold]);
+
   // Refresh data
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -147,15 +200,15 @@ export default function PublicAlertsPage() {
         </div>
 
         {/* Info Banner */}
-        <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+        <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <Info className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                   Public View
                 </p>
-                <p className="text-sm text-blue-600 dark:text-blue-400">
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">
                   You are viewing alerts in read-only mode. Contact a rescuer or administrator to respond to alerts.
                 </p>
               </div>
@@ -181,8 +234,8 @@ export default function PublicAlertsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                  <Megaphone className="w-5 h-5 text-blue-600" />
+                <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                  <Megaphone className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{rescueStats.activeCampaigns}</div>
@@ -275,6 +328,54 @@ export default function PublicAlertsPage() {
                         {campaign.nodeAssignments?.length || 0} nodes
                       </Badge>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* News & Updates */}
+        {newsItems.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Newspaper className="w-5 h-5 text-emerald-600" />
+                Latest News & Updates
+              </CardTitle>
+              <CardDescription>
+                Real-time updates from the field
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {newsItems.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-lg border bg-muted/30">
+                    {item.type === 'success' && (
+                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 shrink-0">
+                        <HeartPulse className="w-3 h-3 mr-1" />
+                        Rescued
+                      </Badge>
+                    )}
+                    {item.type === 'safe' && (
+                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 shrink-0">
+                        <ShieldCheck className="w-3 h-3 mr-1" />
+                        Safe
+                      </Badge>
+                    )}
+                    {item.type === 'danger' && (
+                      <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 shrink-0">
+                        <AlertOctagon className="w-3 h-3 mr-1" />
+                        Danger
+                      </Badge>
+                    )}
+                    {item.type === 'active' && (
+                      <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0 shrink-0">
+                        <Siren className="w-3 h-3 mr-1" />
+                        Active
+                      </Badge>
+                    )}
+                    <span className="text-sm">{item.text}</span>
                   </div>
                 ))}
               </div>

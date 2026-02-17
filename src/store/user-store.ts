@@ -34,8 +34,12 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   addUser: async (user: User) => {
     try {
-      await db.users.add(user);
-      set(state => ({ users: [...state.users, user] }));
+      await db.users.put(user);
+      set(state => ({
+        users: state.users.some(u => u.id === user.id)
+          ? state.users.map(u => u.id === user.id ? user : u)
+          : [...state.users, user],
+      }));
     } catch (error) {
       set({ error: (error as Error).message });
     }

@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { WebSocketClient, ConnectionStatus } from '@/lib/websocket/websocket-client';
-import { SensorDataPayload, TelemetryPayload, SensorReading } from '@/types';
+import { SensorDataPayload, TelemetryPayload, SensorReading, Alert, AlertSeverity, SurvivorProbability } from '@/types';
 import { useDeviceStore, useSensorStore } from '@/store';
+import { useAlertStore } from '@/store/alert-store';
 
 interface WebSocketContextValue {
   status: ConnectionStatus;
@@ -29,6 +30,9 @@ export function WebSocketProvider({
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const { updateDevice, addDevice } = useDeviceStore();
   const { addReading } = useSensorStore();
+  const { addAlert } = useAlertStore();
+  // Track which devices already have active threshold alerts to avoid spamming
+  const thresholdAlertedDevices = useRef<Set<string>>(new Set());
 
   // Handle sensor data from mesh nodes
   const handleSensorData = useCallback(
@@ -45,6 +49,37 @@ export function WebSocketProvider({
         receivedAt: new Date().toISOString(),
       };
       addReading(reading);
+
+      // Auto-create threshold alert if CO2 exceeds threshold
+      const sensorState = useSensorStore.getState();
+      const threshold = sensorState.thresholds.co2Threshold;
+      if (payload.co2 > threshold && !thresholdAlertedDevices.current.has(payload.deviceId)) {
+        thresholdAlertedDevices.current.add(payload.deviceId);
+
+        const probToSeverity: Record<SurvivorProbability, AlertSeverity> = {
+          high: 'critical',
+          moderate: 'high',
+          low: 'medium',
+          none: 'low',
+        };
+        const prob = sensorState.getSurvivorProbability(payload.deviceId);
+        const severity = probToSeverity[prob] || 'medium';
+
+        const alert: Alert = {
+          id: `threshold-${payload.deviceId}-${Date.now()}`,
+          deviceId: payload.deviceId,
+          type: 'sensor_threshold',
+          severity,
+          status: 'active',
+          title: `CO2 threshold exceeded on ${payload.deviceId}`,
+          description: `CO2 reading ${payload.co2} ppm exceeds threshold of ${threshold} ppm. Survivor probability: ${prob.toUpperCase()}.`,
+          triggeredAt: new Date().toISOString(),
+        };
+        addAlert(alert);
+      } else if (payload.co2 <= threshold) {
+        // Clear the flag so a new alert can be created if it crosses again
+        thresholdAlertedDevices.current.delete(payload.deviceId);
+      }
 
       // Auto-create or update device entry from sensor data
       const existingDevice = useDeviceStore.getState().devices.find(
@@ -68,7 +103,7 @@ export function WebSocketProvider({
         });
       }
     },
-    [addReading, updateDevice, addDevice]
+    [addReading, updateDevice, addDevice, addAlert]
   );
 
   // Handle telemetry data (battery, voltage, environment)

@@ -37,6 +37,7 @@ export async function uploadDataToCloud(): Promise<CloudSyncResult> {
   // Get sensor readings from Zustand in-memory store
   const sensorState = useSensorStore.getState();
   const latestReadings = Object.entries(sensorState.readings);
+  const readingHistory = sensorState.readingHistory;
 
   // Build all documents to write
   type DocEntry = { collection: string; id: string; data: Record<string, unknown> };
@@ -54,8 +55,24 @@ export async function uploadDataToCloud(): Promise<CloudSyncResult> {
   for (const campaign of campaigns) {
     allDocs.push({ collection: 'campaigns', id: campaign.id, data: { ...campaign } });
   }
+
+  // Upload latest reading per device
   for (const [deviceId, reading] of latestReadings) {
     allDocs.push({ collection: 'sensorReadings', id: deviceId, data: { ...reading } });
+  }
+
+  // Upload full reading history as subcollections
+  let totalHistoryReadings = 0;
+  for (const [deviceId, history] of Object.entries(readingHistory)) {
+    for (const reading of history) {
+      const historyId = `${reading.timestamp}`;
+      allDocs.push({
+        collection: `sensorReadings/${deviceId}/history`,
+        id: historyId,
+        data: { ...reading },
+      });
+      totalHistoryReadings++;
+    }
   }
 
   // Write in batches of 500 (Firestore limit)
@@ -75,7 +92,7 @@ export async function uploadDataToCloud(): Promise<CloudSyncResult> {
   result.devices = devices.length;
   result.alerts = alerts.length;
   result.campaigns = campaigns.length;
-  result.sensorReadings = latestReadings.length;
+  result.sensorReadings = latestReadings.length + totalHistoryReadings;
 
   return result;
 }

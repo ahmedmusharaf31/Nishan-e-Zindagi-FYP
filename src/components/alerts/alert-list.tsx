@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Bell, BellOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AlertListProps {
   alerts: Alert[];
@@ -107,22 +108,22 @@ export function AlertList({
 
       {/* Filters */}
       {showFilters && (
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className={cn("gap-2 mb-4", compact ? "flex flex-col" : "flex flex-col sm:flex-row")}>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search alerts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className={cn("pl-9", compact && "h-8 text-sm")}
             />
           </div>
-          <div className="flex gap-2">
+          <div className={cn("flex gap-2", compact && "flex-col")}>
             <Select
               value={statusFilter}
               onValueChange={(value) => setStatusFilter(value as AlertStatus | 'all')}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className={cn(compact ? "w-full h-8 text-sm" : "w-[140px]")}>
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -138,7 +139,7 @@ export function AlertList({
               value={severityFilter}
               onValueChange={(value) => setSeverityFilter(value as AlertSeverity | 'all')}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className={cn(compact ? "w-full h-8 text-sm" : "w-[140px]")}>
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
               <SelectContent>

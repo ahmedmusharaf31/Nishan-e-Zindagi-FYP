@@ -50,7 +50,7 @@ function getDashboardRoute(role?: string) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signInWithGoogle, signInWithGitHub, signOut } = useAuth();
+  const { signIn, signInWithGoogle, signInWithGitHub } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'github' | null>(null);
@@ -72,7 +72,8 @@ export default function LoginPage() {
       const profile = await signIn(data.email, data.password);
       router.push(getDashboardRoute(profile?.role));
     } catch (err) {
-      setError((err as Error).message || 'Failed to sign in');
+      const message = (err as Error).message || 'Failed to sign in';
+      setError(message.includes('No account found') ? 'NO_ACCOUNT' : message);
     } finally {
       setIsLoading(false);
     }
@@ -87,14 +88,9 @@ export default function LoginPage() {
         ? await signInWithGoogle()
         : await signInWithGitHub();
 
-      if (!profile) {
-        // No existing profile — user needs to register first
-        await signOut();
-        setError('No account found. Please register first.');
-        return;
+      if (profile) {
+        router.push(getDashboardRoute(profile.role));
       }
-
-      router.push(getDashboardRoute(profile.role));
     } catch (err) {
       setError((err as Error).message || `Failed to sign in with ${provider}`);
     } finally {
@@ -195,9 +191,24 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit(onSubmit)}>
             <CardContent className="space-y-4 pt-0">
               {error && (
-                <div className="flex items-center gap-2 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800/50">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {error}
+                <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800/50">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {error === 'NO_ACCOUNT' ? (
+                      <div>
+                        <p className="font-medium">No account found.</p>
+                        <p className="mt-1 text-red-500 dark:text-red-400/80">
+                          Please{' '}
+                          <Link href="/register" className="underline font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700">
+                            create an account
+                          </Link>
+                          {' '}first and choose your role (Admin, Rescuer, or Public).
+                        </p>
+                      </div>
+                    ) : (
+                      error
+                    )}
+                  </div>
                 </div>
               )}
 

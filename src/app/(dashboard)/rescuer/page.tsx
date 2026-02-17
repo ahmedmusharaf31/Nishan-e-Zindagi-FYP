@@ -187,7 +187,7 @@ export default function RescuerDashboardPage() {
         </div>
 
         {/* Threshold Settings */}
-        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+        <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Settings2 className="w-5 h-5" />
@@ -334,6 +334,7 @@ export default function RescuerDashboardPage() {
                 onViewOnMap={handleViewOnMap}
                 maxHeight="450px"
                 showFilters={true}
+                compact={true}
               />
             </CardContent>
           </Card>

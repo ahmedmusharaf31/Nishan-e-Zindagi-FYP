@@ -71,7 +71,7 @@ export default function Home() {
               Nishan-e-Zindagi
             </h1>
             <p className="text-xl sm:text-2xl text-green-100 max-w-2xl mx-auto drop-shadow">
-              AI-powered disaster rescue system using mesh networks and CO2 detection to locate and save survivors
+              A Distributed Framework for Search-and-Rescue in Disaster Relief
             </p>
             <div className="flex items-center justify-center gap-4 pt-4">
               {isAuthenticated ? (
