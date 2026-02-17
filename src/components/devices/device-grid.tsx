@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeviceStore } from '@/store/device-store';
+import { useAlertStore } from '@/store/alert-store';
 import { DeviceStatusCard } from './device-status-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,10 +9,17 @@ import { Loader2, Radio } from 'lucide-react';
 
 export function DeviceGrid() {
   const { devices, isLoading } = useDeviceStore();
+  const { alerts } = useAlertStore();
 
   const onlineDevices = devices.filter(d => d.status === 'online');
   const offlineDevices = devices.filter(d => d.status === 'offline');
-  const warningDevices = devices.filter(d => d.status === 'warning' || d.status === 'critical');
+
+  const activeAlertDeviceIds = new Set(
+    alerts
+      .filter(a => a.status === 'active' && a.deviceId !== 'manual-report')
+      .map(a => a.deviceId)
+  );
+  const alertDevices = devices.filter(d => activeAlertDeviceIds.has(d.id));
 
   if (isLoading) {
     return (
@@ -58,7 +66,7 @@ export function DeviceGrid() {
               Offline ({offlineDevices.length})
             </TabsTrigger>
             <TabsTrigger value="warning">
-              Alerts ({warningDevices.length})
+              Alerts ({alertDevices.length})
             </TabsTrigger>
           </TabsList>
 
@@ -88,7 +96,7 @@ export function DeviceGrid() {
 
           <TabsContent value="warning">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {warningDevices.map(device => (
+              {alertDevices.map(device => (
                 <DeviceStatusCard key={device.id} device={device} />
               ))}
             </div>
