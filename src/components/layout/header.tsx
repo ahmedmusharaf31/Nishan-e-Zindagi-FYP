@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -25,11 +26,28 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const router = useRouter();
   const { userProfile, signOut } = useAuth();
-  const { getActiveAlerts, alerts } = useAlertStore();
+  const { getActiveAlerts, alerts, acknowledgeAlert } = useAlertStore();
 
   const activeAlerts = getActiveAlerts();
   // Show recent alerts (up to 10, newest first)
   const recentAlerts = alerts.slice(0, 10);
+
+  // Route to the appropriate alerts page based on user role
+  const getAlertsRoute = useCallback(() => {
+    const role = userProfile?.role;
+    if (role === 'admin' || role === 'rescuer') {
+      return '/dashboard/alerts';
+    }
+    return '/public';
+  }, [userProfile?.role]);
+
+  // Handle clicking a specific notification - acknowledge it and navigate
+  const handleNotificationClick = useCallback(async (alert: Alert) => {
+    if (alert.status === 'active') {
+      await acknowledgeAlert(alert.id, userProfile?.displayName || 'unknown');
+    }
+    router.push(getAlertsRoute());
+  }, [acknowledgeAlert, userProfile?.displayName, router, getAlertsRoute]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -130,7 +148,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <DropdownMenuItem
                     key={alert.id}
                     className="flex items-start gap-3 py-3 cursor-pointer"
-                    onClick={() => router.push('/dashboard/alerts')}
+                    onClick={() => handleNotificationClick(alert)}
                   >
                     {getSeverityIcon(alert.severity)}
                     <div className="flex-1 min-w-0">
@@ -155,7 +173,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-center justify-center text-sm text-primary cursor-pointer"
-                    onClick={() => router.push('/dashboard/alerts')}
+                    onClick={() => router.push(getAlertsRoute())}
                   >
                     View all alerts
                   </DropdownMenuItem>

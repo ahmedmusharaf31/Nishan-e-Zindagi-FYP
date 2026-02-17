@@ -56,22 +56,32 @@ export async function uploadDataToCloud(): Promise<CloudSyncResult> {
     allDocs.push({ collection: 'campaigns', id: campaign.id, data: { ...campaign } });
   }
 
-  // Upload latest reading per device
-  for (const [deviceId, reading] of latestReadings) {
-    allDocs.push({ collection: 'sensorReadings', id: deviceId, data: { ...reading } });
-  }
-
-  // Upload full reading history as subcollections
-  let totalHistoryReadings = 0;
+  // Upload all sensor readings as flat documents in sensorReadings collection
+  // Each reading gets a unique ID: deviceId-timestamp
+  const seenReadingIds = new Set<string>();
   for (const [deviceId, history] of Object.entries(readingHistory)) {
     for (const reading of history) {
-      const historyId = `${reading.timestamp}`;
+      const readingId = `${deviceId}-${reading.timestamp}`;
+      if (!seenReadingIds.has(readingId)) {
+        seenReadingIds.add(readingId);
+        allDocs.push({
+          collection: 'sensorReadings',
+          id: readingId,
+          data: { ...reading },
+        });
+      }
+    }
+  }
+  // Also include latest readings in case they're not in history yet
+  for (const [deviceId, reading] of latestReadings) {
+    const readingId = `${deviceId}-${reading.timestamp}`;
+    if (!seenReadingIds.has(readingId)) {
+      seenReadingIds.add(readingId);
       allDocs.push({
-        collection: `sensorReadings/${deviceId}/history`,
-        id: historyId,
+        collection: 'sensorReadings',
+        id: readingId,
         data: { ...reading },
       });
-      totalHistoryReadings++;
     }
   }
 
@@ -92,7 +102,7 @@ export async function uploadDataToCloud(): Promise<CloudSyncResult> {
   result.devices = devices.length;
   result.alerts = alerts.length;
   result.campaigns = campaigns.length;
-  result.sensorReadings = latestReadings.length + totalHistoryReadings;
+  result.sensorReadings = seenReadingIds.size;
 
   return result;
 }

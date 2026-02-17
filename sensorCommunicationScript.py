@@ -4,8 +4,8 @@ import json
 
 # ================= CONFIGURATION =================
 DEVICE_ID = "PicoB-001"
-HOME_LAT = 34.070344
-HOME_LON = 72.643019
+HOME_LAT = 34.070258
+HOME_LON = 72.6426586
 DUMMY_BATT = 98
 
 # ================= INITIALIZATION =================
@@ -154,4 +154,4 @@ while True:
         except OSError:
             print("SCD41 Sensor Busy")
 
-    time.sleep(5)
+    time.sleep(10)

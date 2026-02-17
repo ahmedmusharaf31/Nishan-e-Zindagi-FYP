@@ -7,18 +7,21 @@ export function generateCampaignReport(report: CampaignReport) {
   const { campaign, rescuerNames, deviceNames } = report;
 
   // Header
+  doc.setFillColor(22, 163, 74);
+  doc.rect(0, 0, 210, 38, 'F');
   doc.setFontSize(20);
-  doc.setTextColor(0, 102, 204);
+  doc.setTextColor(255, 255, 255);
   doc.text('Nishan-e-Zindagi', 14, 20);
   doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text('Disaster Rescue System - Campaign Report', 14, 28);
-  doc.line(14, 32, 196, 32);
+  doc.setTextColor(220, 252, 231);
+  doc.text('Disaster Rescue System - Campaign Report', 14, 30);
+  doc.setDrawColor(255, 255, 255);
 
   // Campaign Overview
   doc.setFontSize(14);
+  doc.setTextColor(22, 163, 74);
+  doc.text('Campaign Overview', 14, 48);
   doc.setTextColor(0);
-  doc.text('Campaign Overview', 14, 42);
 
   const campaignName = campaign.name || `Campaign #${campaign.id.slice(-6).toUpperCase()}`;
   const status = campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1);
@@ -31,9 +34,9 @@ export function generateCampaignReport(report: CampaignReport) {
   const survivors = campaign.totalSurvivorsFound || 0;
 
   autoTable(doc, {
-    startY: 46,
+    startY: 52,
     theme: 'grid',
-    headStyles: { fillColor: [0, 102, 204] },
+    headStyles: { fillColor: [22, 163, 74] },
     body: [
       ['Campaign Name', campaignName],
       ['Status', status],
@@ -52,13 +55,15 @@ export function generateCampaignReport(report: CampaignReport) {
   // Node Assignments Table
   const currentY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
   doc.setFontSize(14);
+  doc.setTextColor(22, 163, 74);
   doc.text('Node Assignments', 14, currentY);
+  doc.setTextColor(0);
 
   if (campaign.nodeAssignments && campaign.nodeAssignments.length > 0) {
     autoTable(doc, {
       startY: currentY + 4,
       theme: 'striped',
-      headStyles: { fillColor: [0, 102, 204] },
+      headStyles: { fillColor: [22, 163, 74] },
       head: [['Device', 'Status', 'Rescuers', 'Survivors', 'Rescued At']],
       body: campaign.nodeAssignments.map(node => [
         deviceNames[node.deviceId] || node.deviceId,
@@ -76,10 +81,14 @@ export function generateCampaignReport(report: CampaignReport) {
   if (currentY2 > 250) {
     doc.addPage();
     doc.setFontSize(14);
+    doc.setTextColor(22, 163, 74);
     doc.text('Rescuer Performance', 14, 20);
+    doc.setTextColor(0);
   } else {
     doc.setFontSize(14);
+    doc.setTextColor(22, 163, 74);
     doc.text('Rescuer Performance', 14, currentY2);
+    doc.setTextColor(0);
   }
 
   const rescuerPerf = (campaign.assignedRescuerIds || []).map(rid => {
@@ -93,7 +102,7 @@ export function generateCampaignReport(report: CampaignReport) {
     autoTable(doc, {
       startY: currentY2 > 250 ? 24 : currentY2 + 4,
       theme: 'striped',
-      headStyles: { fillColor: [0, 102, 204] },
+      headStyles: { fillColor: [22, 163, 74] },
       head: [['Rescuer', 'Nodes Assigned', 'Nodes Rescued', 'Survivors Found']],
       body: rescuerPerf,
     });
@@ -104,16 +113,20 @@ export function generateCampaignReport(report: CampaignReport) {
   if (currentY3 > 250) {
     doc.addPage();
     doc.setFontSize(14);
+    doc.setTextColor(22, 163, 74);
     doc.text('Status Timeline', 14, 20);
+    doc.setTextColor(0);
   } else {
     doc.setFontSize(14);
+    doc.setTextColor(22, 163, 74);
     doc.text('Status Timeline', 14, currentY3);
+    doc.setTextColor(0);
   }
 
   autoTable(doc, {
     startY: currentY3 > 250 ? 24 : currentY3 + 4,
     theme: 'striped',
-    headStyles: { fillColor: [0, 102, 204] },
+    headStyles: { fillColor: [22, 163, 74] },
     head: [['Status', 'Timestamp', 'Updated By', 'Note']],
     body: campaign.statusHistory.map(entry => [
       entry.status.charAt(0).toUpperCase() + entry.status.slice(1).replace('_', ' '),
@@ -143,18 +156,21 @@ export function generateAggregateReport(campaigns: Campaign[], rescuerNames: Rec
   const doc = new jsPDF();
 
   // Header
+  doc.setFillColor(22, 163, 74);
+  doc.rect(0, 0, 210, 38, 'F');
   doc.setFontSize(20);
-  doc.setTextColor(0, 102, 204);
+  doc.setTextColor(255, 255, 255);
   doc.text('Nishan-e-Zindagi', 14, 20);
   doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text('Disaster Rescue System - Aggregate Report', 14, 28);
-  doc.line(14, 32, 196, 32);
+  doc.setTextColor(220, 252, 231);
+  doc.text('Disaster Rescue System - Aggregate Report', 14, 30);
+  doc.setDrawColor(255, 255, 255);
 
   // Summary
   doc.setFontSize(14);
+  doc.setTextColor(22, 163, 74);
+  doc.text('Summary', 14, 48);
   doc.setTextColor(0);
-  doc.text('Summary', 14, 42);
 
   const totalCampaigns = campaigns.length;
   const resolved = campaigns.filter(c => c.status === 'resolved').length;
@@ -164,9 +180,9 @@ export function generateAggregateReport(campaigns: Campaign[], rescuerNames: Rec
   const rescuedNodes = campaigns.reduce((sum, c) => sum + (c.nodeAssignments?.filter(n => n.status === 'rescued').length || 0), 0);
 
   autoTable(doc, {
-    startY: 46,
+    startY: 52,
     theme: 'grid',
-    headStyles: { fillColor: [0, 102, 204] },
+    headStyles: { fillColor: [22, 163, 74] },
     body: [
       ['Total Campaigns', String(totalCampaigns)],
       ['Active', String(active)],
@@ -182,12 +198,14 @@ export function generateAggregateReport(campaigns: Campaign[], rescuerNames: Rec
   // Campaigns Table
   const currentY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
   doc.setFontSize(14);
+  doc.setTextColor(22, 163, 74);
   doc.text('All Campaigns', 14, currentY);
+  doc.setTextColor(0);
 
   autoTable(doc, {
     startY: currentY + 4,
     theme: 'striped',
-    headStyles: { fillColor: [0, 102, 204] },
+    headStyles: { fillColor: [22, 163, 74] },
     head: [['Campaign', 'Status', 'Nodes', 'Rescuers', 'Survivors', 'Date']],
     body: campaigns.map(c => [
       c.name || `#${c.id.slice(-6).toUpperCase()}`,

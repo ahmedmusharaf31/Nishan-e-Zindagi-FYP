@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Campaign, CampaignStatus, CampaignNote, CampaignStatusHistoryEntry, CampaignStats, NodeAssignment } from '@/types';
 import { db } from '@/lib/storage/indexed-db';
 import { generateId } from '@/lib/utils';
+import { useAlertStore } from '@/store/alert-store';
 
 interface CampaignState {
   campaigns: Campaign[];
@@ -366,6 +367,24 @@ export const useStore = create<CampaignState>((set, get) => ({
       totalSurvivorsFound: totalSurvivors,
       statusHistory: [...campaign.statusHistory, historyEntry],
     });
+
+    // Resolve all associated alerts
+    const alertStore = useAlertStore.getState();
+    for (const alertId of campaign.alertIds || []) {
+      const alert = alertStore.getAlertById(alertId);
+      if (alert && alert.status !== 'resolved') {
+        await alertStore.resolveAlert(alertId);
+      }
+    }
+    // Also resolve alerts linked through node assignments
+    for (const node of campaign.nodeAssignments || []) {
+      if (node.alertId) {
+        const alert = alertStore.getAlertById(node.alertId);
+        if (alert && alert.status !== 'resolved') {
+          await alertStore.resolveAlert(node.alertId);
+        }
+      }
+    }
   },
 
   getCampaignStats: () => {

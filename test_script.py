@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 import meshtastic
 import meshtastic.serial_interface
 from pubsub import pub
@@ -17,6 +18,7 @@ app.add_middleware(
 connected_clients: set[WebSocket] = set()
 message_queue: asyncio.Queue | None = None
 main_loop: asyncio.AbstractEventLoop | None = None
+last_power_print: dict = {}
 
 @app.on_event("startup")
 async def startup():
@@ -89,7 +91,10 @@ def on_receive(packet, interface):
                 "uptime": uptime
             })
             
-            print(f"Power from {name}: Batt: {batt}%, Volt: {volt}V")
+            now = time.time()
+            if now - last_power_print.get(name, 0) >= 10:
+                last_power_print[name] = now
+                print(f"Power from {name}: Batt: {batt}%, Volt: {volt}V")
 
         elif "environmentMetrics" in telemetry:
             env = telemetry["environmentMetrics"]

@@ -6,6 +6,8 @@ import { SensorDataPayload, TelemetryPayload, SensorReading, Alert, AlertSeverit
 import { useDeviceStore, useSensorStore } from '@/store';
 import { useAlertStore } from '@/store/alert-store';
 
+const OFFLINE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
 interface WebSocketContextValue {
   status: ConnectionStatus;
   connect: () => void;
@@ -159,6 +161,24 @@ export function WebSocketProvider({
       wsClient.disconnect();
     };
   }, [autoConnect, wsUrl, handleSensorData, handleTelemetry, handleStatusChange]);
+
+  // Periodically check for devices that haven't sent data in 10 minutes and mark them offline
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const deviceStore = useDeviceStore.getState();
+      const now = Date.now();
+      for (const device of deviceStore.devices) {
+        if (device.status !== 'offline' && device.lastSeenAt) {
+          const lastSeen = new Date(device.lastSeenAt).getTime();
+          if (now - lastSeen > OFFLINE_TIMEOUT_MS) {
+            deviceStore.updateDevice(device.id, { status: 'offline' });
+          }
+        }
+      }
+    }, 60_000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   const connect = useCallback(() => {
     client?.connect();

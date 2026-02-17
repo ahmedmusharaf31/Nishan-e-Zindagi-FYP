@@ -62,9 +62,29 @@ export default function PublicAlertsPage() {
     return device?.name;
   }, [devices]);
 
+  // Collect device IDs that belong to resolved/cancelled campaigns
+  const resolvedDeviceIds = useMemo(() => {
+    const ids = new Set<string>();
+    campaigns
+      .filter(c => ['resolved', 'cancelled'].includes(c.status))
+      .forEach(c => {
+        // Collect deviceIds from nodeAssignments
+        c.nodeAssignments?.forEach(n => {
+          if (n.deviceId) ids.add(n.deviceId);
+        });
+        // Also collect from alertIds -> alert -> deviceId
+        c.alertIds?.forEach(alertId => {
+          const alert = alerts.find(a => a.id === alertId);
+          if (alert) ids.add(alert.deviceId);
+        });
+      });
+    return ids;
+  }, [campaigns, alerts]);
+
   // Filter alerts
   const filteredAlerts = useMemo(() => {
-    let filtered = alerts;
+    // Exclude alerts whose device belongs to a resolved/cancelled campaign
+    let filtered = alerts.filter(a => !resolvedDeviceIds.has(a.deviceId));
 
     // Status filter
     if (statusFilter !== 'all') {
@@ -91,15 +111,20 @@ export default function PublicAlertsPage() {
     return [...filtered].sort(
       (a, b) => new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()
     );
-  }, [alerts, statusFilter, severityFilter, searchQuery, getDeviceName]);
+  }, [alerts, resolvedDeviceIds, statusFilter, severityFilter, searchQuery, getDeviceName]);
 
-  // Alert stats
+  // Alert stats (excluding alerts from resolved campaigns)
+  const nonResolvedAlerts = useMemo(() =>
+    alerts.filter(a => !resolvedDeviceIds.has(a.deviceId)),
+    [alerts, resolvedDeviceIds]
+  );
+
   const alertStats = useMemo(() => ({
-    total: alerts.length,
-    active: alerts.filter((a) => a.status === 'active').length,
-    critical: alerts.filter((a) => a.severity === 'critical' && a.status === 'active').length,
-    high: alerts.filter((a) => a.severity === 'high' && a.status === 'active').length,
-  }), [alerts]);
+    total: nonResolvedAlerts.length,
+    active: nonResolvedAlerts.filter((a) => a.status === 'active').length,
+    critical: nonResolvedAlerts.filter((a) => a.severity === 'critical' && a.status === 'active').length,
+    high: nonResolvedAlerts.filter((a) => a.severity === 'high' && a.status === 'active').length,
+  }), [nonResolvedAlerts]);
 
   // Campaign/rescue stats
   const rescueStats = useMemo(() => {
@@ -442,7 +467,7 @@ export default function PublicAlertsPage() {
               <Badge variant="secondary">{filteredAlerts.length} alerts</Badge>
             </div>
             <CardDescription>
-              Showing {filteredAlerts.length} of {alerts.length} total alerts
+              Showing {filteredAlerts.length} of {nonResolvedAlerts.length} total alerts
             </CardDescription>
           </CardHeader>
           <CardContent>

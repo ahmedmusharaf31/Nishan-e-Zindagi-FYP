@@ -11,7 +11,7 @@ import { useSensorStore } from '@/store';
 // Status color mapping (fallback when no sensor data)
 const statusColors: Record<DeviceStatus, string> = {
   online: '#22c55e',    // green-500
-  offline: '#ef4444',   // red-500
+  offline: '#6b7280',   // grey-500
   warning: '#f59e0b',   // amber-500
   critical: '#dc2626',  // red-600
 };
@@ -84,7 +84,7 @@ export function DeviceMarker({ device, onClick }: DeviceMarkerProps) {
   const reading = getLatestReading(device.id);
   const probability = getSurvivorProbability(device.id);
 
-  const icon = createMarkerIcon(device.status, reading ? probability : undefined);
+  const icon = createMarkerIcon(device.status, device.status !== 'offline' && reading ? probability : undefined);
   const position: [number, number] = [device.location.latitude, device.location.longitude];
 
   const statusVariant = {
