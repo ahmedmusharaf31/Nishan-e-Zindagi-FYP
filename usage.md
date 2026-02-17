@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nishan-e-Zindagi (Sign of Life) is an emergency response system that uses Meshtastic LoRa mesh network devices to detect potential survivors in disaster areas. Sensor nodes measure CO2, temperature, and humidity levels. The data is transmitted over the mesh network to a gateway, which forwards it to a live web dashboard via WebSocket.
+Nishan-e-Zindagi (Sign of Life) is an emergency response system that uses Meshtastic LoRa mesh network devices to detect potential survivors in disaster areas. Sensor nodes measure CO2, temperature, and humidity levels. The data is transmitted over the mesh network to a gateway, which forwards it to a live web dashboard via WebSocket. Rescuers can also manually pin survivor locations on the map and create alerts directly from field reports.
 
 ## Architecture
 
@@ -14,6 +14,8 @@ Nishan-e-Zindagi (Sign of Life) is an emergency response system that uses Meshta
                                       [WebSocket /ws]
                                             |
                                   [Next.js Dashboard (Browser)]
+                                            |
+                                    [IndexedDB (Dexie)]
 ```
 
 ## Prerequisites
@@ -93,64 +95,248 @@ Sensor nodes send JSON payloads via Meshtastic text messages:
 
 Battery telemetry is sent separately via Meshtastic TELEMETRY_APP.
 
-## Using the Dashboard
-
-### Login
+## Login & Roles
 
 Use the demo credentials to log in:
-- **Admin**: admin@demo.com
-- **Rescuer**: rescuer@demo.com
-- **Public**: public@demo.com
 
-### Rescuer Dashboard
+| Role | Email | Access |
+|------|-------|--------|
+| **Admin** | admin@demo.com | Full access to all pages |
+| **Rescuer** | rescuer@demo.com | Map & Alerts, Campaigns, Mark Survivor Location, Public, Reports |
+| **Public** | public@demo.com | Public Alerts and Reports (read-only) |
 
-The rescuer dashboard is the primary operational view:
+Firebase Google OAuth is also supported for production use.
 
-1. **Stats Cards**: Quick overview of online devices, active alerts, campaigns, and survivor signals
-2. **CO2 Threshold Settings**: Enter the ambient CO2 level of the surrounding area
-3. **Live Map**: Color-coded markers showing device locations and survivor probability
-4. **Live Sensor Data**: Real-time readings from all reporting sensor nodes
-5. **Alerts Panel**: Active alerts with acknowledge/resolve actions
+---
 
-### Setting CO2 Thresholds
+## Navigation
 
-The CO2 threshold determines survivor detection sensitivity:
+The left sidebar shows routes based on your role:
 
-1. Navigate to the **Rescuer Dashboard**
-2. In the **CO2 Threshold Settings** card, enter the ambient (outdoor) CO2 level in ppm
-3. A typical outdoor ambient level is **400-500 ppm**
-4. In a disaster zone with dust/debris, ambient may be higher (**600-800 ppm**)
+| Nav Item | Route | Roles |
+|----------|-------|-------|
+| Dashboard | `/admin` | Admin |
+| User Management | `/admin/users` | Admin |
+| Map & Alerts | `/rescuer` | Rescuer, Admin |
+| Campaigns | `/rescuer/campaigns` | Rescuer, Admin |
+| Mark Survivor Location | `/rescuer/mark-location` | Rescuer, Admin |
+| Public Alerts | `/public` | All |
+| Reports | `/reports` | All |
 
-### Color Coding
+---
 
-Map markers and device cards are color-coded based on CO2 readings relative to your threshold:
+## Pages
+
+### Admin Dashboard — `/admin`
+
+Overview of the entire operation. Accessible to **Admin** only.
+
+- **Stats**: Total users, online devices, active alerts (critical count), active campaigns
+- **Device Grid**: All registered sensor devices with their current status
+- **Actions**: Upload data to cloud, start a new rescue campaign
+
+---
+
+### User Management — `/admin/users`
+
+Manage the team. Accessible to **Admin** only.
+
+- **Stats**: Total users, count by role (Admin / Rescuer / Public)
+- **Table**: All user accounts with name, email, role, and status
+- **Actions**:
+  - Add a new user
+  - Search users by name or email
+  - Filter by role
+  - Edit user details or role
+  - Delete users
+
+---
+
+### Map & Alerts (Rescuer Dashboard) — `/rescuer`
+
+Primary operational view. Accessible to **Rescuer** and **Admin**.
+
+**Stats Cards**
+- Online Devices, Active Alerts, Active Campaigns, My Campaigns, Survivor Signals
+
+**CO2 Threshold Settings**
+Enter the ambient (outdoor/background) CO2 level for the area. The system uses this value to determine survivor probability for all sensor nodes. A typical outdoor value is 400–500 ppm; dusty disaster zones may read 600–800 ppm.
+
+**Device Locations Map**
+Interactive map showing all sensor nodes as color-coded markers. Click any marker to highlight the device in the data panel below.
+
+**Live Sensor Data**
+Real-time CO2, temperature, and humidity readings from all reporting nodes. Each row is color-coded by survivor probability.
+
+**Recent Alerts Panel**
+Active and acknowledged alerts with inline actions:
+- **Acknowledge** — confirms the alert has been seen
+- **Resolve** — marks the alert as handled; for manual_report alerts, a dialog asks for the number of people rescued
+- **View on Map** — pans the map to the alert location
+
+**Start Campaign** (Admin only)
+Opens a dialog to create a new rescue campaign from one or more selected alerts or devices.
+
+---
+
+### Mark Survivor Location — `/rescuer/mark-location`
+
+Manually pinpoint a potential survivor location based on a verbal or radio field report, without waiting for sensor data. Accessible to **Rescuer** and **Admin**.
+
+**How to use:**
+1. Click **Pin on Map** — the button pulses and the map cursor changes to a crosshair
+2. Click anywhere on the map to drop a purple pulsing marker at that location
+3. Coordinates are automatically filled in the form
+4. Fill in:
+   - **Reported by Rescuer** (pre-filled with your display name)
+   - **Severity** (Critical / High / Medium / Low — default: High)
+   - **Notes** (optional, e.g. "heard voices under rubble")
+5. Click **Create Alert**
+
+The alert is created with type `manual_report` and immediately appears as an active alert in Alert Management, the Public Alerts page, and the Rescuer Dashboard. It flows through the same acknowledge → resolve pipeline as sensor-triggered alerts. When resolved, you will be prompted for the number of people rescued, and that count feeds into the "Total Persons Rescued" stat everywhere.
+
+To remove a pinned location before submitting, click **Clear** next to the coordinates badge.
+
+---
+
+### Alert Management — `/dashboard/alerts`
+
+Full alert log with management actions. Accessible to **Rescuer** and **Admin**.
+
+**Stats Cards** (counts, not person counts)
+- **Critical Alerts** — active alerts with critical severity
+- **Active Alerts** — all currently active alerts
+- **Acknowledged Alerts** — alerts seen but not yet resolved
+- **Resolved Alerts** — fully handled alerts
+
+**Alert List**
+All alerts, scrollable, sorted by most recent. Each card shows:
+- Severity icon and color
+- Status badge (pulsing dot = active)
+- For sensor alerts: device name
+- For manual_report alerts: coordinates, reporting rescuer name, and (when resolved) number of people rescued
+
+**Resolving a Manual Report Alert**
+When you click **Resolve** on a `manual_report` alert, a dialog appears:
+> "How many people were rescued at this location?"
+
+Enter the count and click **Confirm & Resolve**. This number is added to the "Total Persons Rescued" on the Public page and Reports.
+
+---
+
+### Public Alerts — `/public`
+
+Read-only situational awareness page. Accessible to **all roles**.
+
+- **Info Banner** — reminds public users this is a read-only view
+- **Rescue Stats**: Total Persons Rescued (from campaigns + manual reports), Active Operations, Danger Level, Active Alerts
+- **Resolved Rescue Operations** — list of completed campaigns
+- **Latest News & Updates** — recent alerts with severity badges
+- **Filters**: Search by text, filter by status, filter by severity
+
+Public users cannot acknowledge or resolve alerts.
+
+---
+
+### Campaigns — `/rescuer/campaigns`
+
+Track and manage rescue campaigns. Accessible to **Rescuer** and **Admin**.
+
+**Stats**: Deployed Nodes, Deployed Rescuers, Active Campaigns, Total Survivors Found
+
+**Tabs**
+- **All** — every campaign
+- **Active** — ongoing campaigns
+- **My Campaigns** — campaigns assigned to you (rescuer view)
+- **Unassigned** — campaigns with no rescuer assigned (admin view)
+- **Resolved** — completed campaigns
+
+**Campaign Status Flow**
+```
+Initiated → Assigned → Accepted → En Route → On Scene → In Progress → Resolved
+                                                                    ↘ Cancelled
+```
+
+**Actions**
+- **Assign** (admin) — assign one or more rescuers to the campaign
+- **Update Status** — advance the campaign through the workflow
+- **Mark Node Rescued** — record survivors found at a specific node
+- **Add Note** — attach a timestamped field note
+- **Resolve Campaign** — closes the campaign and resolves all linked alerts
+- **Create Campaign** (admin) — start a campaign from selected alerts or devices
+
+---
+
+### Reports & Analytics — `/reports`
+
+Accessible to **all roles** (public view is simplified).
+
+**Controls**
+- **Campaign Selector** — view aggregate stats or drill into a specific campaign
+- **Date Range** — 7d, 14d, 30d, or 90d
+
+**Admin / Rescuer View**
+- Summary stats: Devices, Alerts, Survivors Found, Average Battery
+- Charts: Survivors by Campaign (bar), Alert Trends (area), Campaign Status (pie), Device Status (pie), Alert Severity breakdown, Battery Level distribution
+- Export PDF — full operational report
+
+**Public View**
+- Summary stats: Persons Rescued, Active Operations, Active Alerts, Resolved Campaigns
+- Charts: Alert Trends, Campaign Status
+- Resolved Campaigns list
+- Export PDF — public-facing summary
+
+---
+
+## Color Coding
+
+Map markers and device cards are color-coded based on CO2 readings relative to your set threshold:
 
 | Color | Condition | Meaning |
 |-------|-----------|---------|
-| **Red** | CO2 > 1.5x threshold | HIGH survivor probability - immediate action needed |
-| **Orange** | CO2 > 1.2x threshold | MODERATE probability - investigate |
-| **Yellow** | CO2 > threshold | LOW probability - monitor |
-| **Green** | CO2 <= threshold | No likely survivor - area clear |
+| **Red** | CO2 > 1.5× threshold | HIGH survivor probability — immediate action needed |
+| **Orange** | CO2 > 1.2× threshold | MODERATE probability — investigate |
+| **Yellow** | CO2 > threshold | LOW probability — monitor |
+| **Green** | CO2 ≤ threshold | No likely survivor — area clear |
+| **Purple** | Manual report marker | Survivor location pinned by rescuer field report |
 
-**Example**: If threshold = 800 ppm:
+**Example** — threshold set to 800 ppm:
 - Red: > 1200 ppm
 - Orange: > 960 ppm
 - Yellow: > 800 ppm
-- Green: <= 800 ppm
+- Green: ≤ 800 ppm
 
-### Real-time Updates
+---
 
-The dashboard connects to the Python backend via WebSocket:
-- A green "Live" indicator in the header confirms active connection
-- Sensor data updates appear instantly as mesh nodes report
-- Device locations update on the map in real-time
-- Battery levels update from telemetry messages
+## Real-time Updates
+
+The dashboard connects to the Python backend via WebSocket (`ws://localhost:8000/ws`):
+- A green **Live** indicator in the header confirms an active connection
+- Sensor data, device locations, and battery levels update instantly
+- The dashboard auto-reconnects every 5 seconds if the connection drops
+
+All data is also persisted locally in the browser via **IndexedDB (Dexie)**, so the dashboard retains history between sessions and page refreshes.
+
+---
+
+## Survivor Count Tracking
+
+"Total Persons Rescued" is the sum of:
+1. `totalSurvivorsFound` across all campaigns (populated when nodes are marked rescued)
+2. `survivorsFound` across all resolved `manual_report` alerts (entered in the resolve dialog)
+
+This total is shown on:
+- `/public` — Rescue Stats card
+- `/reports` — Summary stats
+- `/rescuer/campaigns` — Campaign stats header
+
+---
 
 ## Troubleshooting
 
 ### Backend won't connect to Meshtastic
 - Ensure only one application is using the COM port
-- Try different COM port numbers
+- Try different COM port numbers in `test_script.py`
 - Check that Meshtastic firmware is up to date
 
 ### Dashboard shows "Offline"
@@ -161,4 +347,8 @@ The dashboard connects to the Python backend via WebSocket:
 ### No sensor data appearing
 - Verify sensor nodes are powered on and in range
 - Check the Python backend terminal for incoming messages
-- Ensure sensor nodes are sending JSON format in text messages
+- Ensure sensor nodes are sending JSON in the correct format via text messages
+
+### Resolved alert count looks wrong
+- The database schema has been migrated to version 3; demo alerts that were pre-seeded as resolved have been reset to active
+- If counts still seem off, clear IndexedDB in browser DevTools → Application → Storage and reload
