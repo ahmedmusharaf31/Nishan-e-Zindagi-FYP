@@ -1,7 +1,7 @@
 # Nishan-e-Zindagi Web Dashboard - Implementation Progress
 
 ## Project Overview
-A web dashboard for the Nishan-e-Zindagi rescue system with three user views (Admin, Rescuer, Public) that integrates with IoT devices via WebSocket connection.
+A web dashboard for the Nishan-e-Zindagi rescue system with three user views (Admin, Rescuer, Public) that integrates with IoT devices (Nodes) via WebSocket connection.
 
 ---
 
