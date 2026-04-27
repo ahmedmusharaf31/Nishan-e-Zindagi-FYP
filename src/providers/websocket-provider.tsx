@@ -26,7 +26,7 @@ interface WebSocketProviderProps {
 export function WebSocketProvider({
   children,
   autoConnect = true,
-  wsUrl = 'ws://localhost:8000/ws',
+  wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:8000/ws',
 }: WebSocketProviderProps) {
   const [client, setClient] = useState<WebSocketClient | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
