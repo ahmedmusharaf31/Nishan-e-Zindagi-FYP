@@ -13,6 +13,26 @@ export interface CloudSyncResult {
 
 const BATCH_LIMIT = 500; // Firestore batch limit
 
+// Recursively strip undefined values (Firestore rejects them)
+function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      clean[key] = value.map(item =>
+        item !== null && typeof item === 'object' && !Array.isArray(item)
+          ? stripUndefined(item as Record<string, unknown>)
+          : item
+      );
+    } else if (value !== null && typeof value === 'object') {
+      clean[key] = stripUndefined(value as Record<string, unknown>);
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
 export async function uploadDataToCloud(): Promise<CloudSyncResult> {
   if (!firestore) {
     throw new Error('Firebase is not initialized. Check your configuration.');
@@ -92,7 +112,7 @@ export async function uploadDataToCloud(): Promise<CloudSyncResult> {
 
     for (const entry of chunk) {
       const ref = doc(firestore, entry.collection, entry.id);
-      batch.set(ref, entry.data, { merge: true });
+      batch.set(ref, stripUndefined(entry.data), { merge: true });
     }
 
     await batch.commit();
