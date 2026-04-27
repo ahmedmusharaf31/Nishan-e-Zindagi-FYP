@@ -189,12 +189,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
       }
 
-      const userProfile = await loadUserProfile(userCredential.user.email || '');
+      let userProfile = await loadUserProfile(userCredential.user.email || '');
 
-      // No profile found — user must register first
+      // No local profile found — auto-create from Firebase account
       if (!userProfile) {
-        await firebaseSignOut(auth);
-        throw new Error('No account found. Please create an account first.');
+        userProfile = {
+          id: userCredential.user.uid,
+          email: (userCredential.user.email || '').toLowerCase(),
+          displayName: userCredential.user.displayName || 'User',
+          role: 'public',
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        await addUser(userProfile);
       }
 
       setAuthState({
