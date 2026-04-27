@@ -12,7 +12,8 @@ import {
   sendEmailVerification,
   getAdditionalUserInfo,
 } from 'firebase/auth';
-import { auth, isDemoMode, googleProvider, githubProvider } from '@/lib/firebase/config';
+import { auth, firestore, isDemoMode, googleProvider, githubProvider } from '@/lib/firebase/config';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { User, UserRole, AuthState } from '@/types';
 import { useUserStore } from '@/store/user-store';
 
@@ -77,16 +78,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Prevents onAuthStateChanged from overwriting state during explicit auth calls
   const isHandlingAuthRef = useRef(false);
 
-  // Load user profile from store
-  const loadUserProfile = useCallback(async (email: string): Promise<User | null> => {
+  // Fetch user profile from Firestore by UID
+  const fetchUserFromFirestore = useCallback(async (uid: string): Promise<User | null> => {
+    if (!firestore) return null;
+    try {
+      const userDoc = await getDoc(doc(firestore, 'users', uid));
+      if (userDoc.exists()) {
+        return userDoc.data() as User;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user from Firestore:', err);
+    }
+    return null;
+  }, []);
+
+  // Save user profile to Firestore
+  const saveUserToFirestore = useCallback(async (user: User): Promise<void> => {
+    if (!firestore) return;
+    try {
+      await setDoc(doc(firestore, 'users', user.id), { ...user }, { merge: true });
+    } catch (err) {
+      console.warn('Failed to save user to Firestore:', err);
+    }
+  }, []);
+
+  // Load user profile from local store, then Firestore fallback
+  const loadUserProfile = useCallback(async (email: string, uid?: string): Promise<User | null> => {
     // First check demo users
     if (isDemoMode && DEMO_USERS[email]) {
       return DEMO_USERS[email].user;
     }
-    // Then check the store
+    // Then check local store
     const user = await getUserByEmail(email);
-    return user || null;
-  }, [getUserByEmail]);
+    if (user) return user;
+
+    // Fallback: check Firestore
+    if (uid) {
+      const firestoreUser = await fetchUserFromFirestore(uid);
+      if (firestoreUser) {
+        // Cache locally for future use
+        await addUser(firestoreUser);
+        return firestoreUser;
+      }
+    }
+    return null;
+  }, [getUserByEmail, fetchUserFromFirestore, addUser]);
 
   // Handle Firebase auth state changes
   useEffect(() => {
@@ -124,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const userProfile = await loadUserProfile(firebaseUser.email || '');
+        const userProfile = await loadUserProfile(firebaseUser.email || '', firebaseUser.uid);
         setAuthState({
           user: {
             uid: firebaseUser.uid,
@@ -189,9 +225,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
       }
 
-      let userProfile = await loadUserProfile(userCredential.user.email || '');
+      let userProfile = await loadUserProfile(userCredential.user.email || '', userCredential.user.uid);
 
-      // No local profile found — auto-create from Firebase account
+      // No profile found anywhere — auto-create with default role
       if (!userProfile) {
         userProfile = {
           id: userCredential.user.uid,
@@ -202,6 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: new Date().toISOString(),
         };
         await addUser(userProfile);
+        await saveUserToFirestore(userProfile);
       }
 
       setAuthState({
@@ -266,6 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       await addUser(newUser);
+      await saveUserToFirestore(newUser);
 
       // Sign out so user must verify email before accessing the app
       await firebaseSignOut(auth);
@@ -286,14 +324,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const firebaseUser = result.user;
       const isNewFirebaseUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
 
-      // Check if user profile exists in store
-      let userProfile = (await getUserByEmail(firebaseUser.email || '')) || null;
+      // Check if user profile exists locally or in Firestore
+      let userProfile = await loadUserProfile(firebaseUser.email || '', firebaseUser.uid);
 
       // Determine the role to assign
       const assignedRole = role || 'public';
 
       if (!userProfile) {
-        // No local profile — create one
+        // No profile anywhere — create one
         const newUser: User = {
           id: firebaseUser.uid,
           email: (firebaseUser.email || '').toLowerCase(),
@@ -303,14 +341,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: new Date().toISOString(),
         };
         await addUser(newUser);
+        await saveUserToFirestore(newUser);
         userProfile = newUser;
       } else if (isNewFirebaseUser && !role) {
         // New Firebase account but stale local profile — reset to 'public'
         await updateUser(userProfile.id, { role: 'public' });
+        await saveUserToFirestore({ ...userProfile, role: 'public' });
         userProfile = { ...userProfile, role: 'public' };
       } else if (role && userProfile.role !== role) {
         // Re-registration from register page with a different role — update it
         await updateUser(userProfile.id, { role });
+        await saveUserToFirestore({ ...userProfile, role });
         userProfile = { ...userProfile, role };
       }
 
