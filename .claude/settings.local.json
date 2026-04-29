@@ -45,7 +45,8 @@
       "Bash(NODE_OPTIONS=--max-old-space-size=4096 npx next build)",
       "Bash(rm -rf .next node_modules/.cache)",
       "Bash(NODE_OPTIONS=--max-old-space-size=8192 npx next build)",
-      "Bash(ngrok version:*)"
+      "Bash(ngrok version:*)",
+      "Bash(echo \"TSC=$?\")"
     ]
   }
 }
