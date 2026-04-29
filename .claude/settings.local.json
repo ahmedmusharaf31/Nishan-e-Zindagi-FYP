@@ -46,7 +46,14 @@
       "Bash(rm -rf .next node_modules/.cache)",
       "Bash(NODE_OPTIONS=--max-old-space-size=8192 npx next build)",
       "Bash(ngrok version:*)",
-      "Bash(echo \"TSC=$?\")"
+      "Bash(echo \"TSC=$?\")",
+      "Bash(where ngrok *)",
+      "PowerShell(Test-Path *)",
+      "Bash(/c/Users/ahmed/ngrok/ngrok.exe version *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(/c/Users/ahmed/ngrok/ngrok.exe http *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)"
     ]
   }
 }
